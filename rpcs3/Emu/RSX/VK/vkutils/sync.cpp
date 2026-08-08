@@ -8,6 +8,9 @@
 
 #include "Emu/Cell/timers.hpp"
 
+#include <chrono>
+#include <thread>
+
 #include "util/sysinfo.hpp"
 #include "util/asm.hpp"
 
@@ -605,6 +608,9 @@ namespace vk
 
 		u64 start = 0;
 
+		u64 polls = 0;
+		constexpr u64 hot_polls = 512;
+
 		while (true)
 		{
 			switch (const auto status = pEvent->status())
@@ -636,7 +642,14 @@ namespace vk
 				}
 			}
 
-			utils::pause();
+			if (++polls <= hot_polls)
+			{
+				utils::pause();
+			}
+			else
+			{
+				std::this_thread::sleep_for(std::chrono::microseconds(50));
+			}
 		}
 	}
 }
