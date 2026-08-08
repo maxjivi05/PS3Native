@@ -1,5 +1,8 @@
 #include "stdafx.h"
 #include "BufferUtils.h"
+
+#include <vector>
+#include <cstring>
 #include "util/to_endian.hpp"
 #include "util/sysinfo.hpp"
 #include "Utilities/JIT.h"
@@ -771,6 +774,48 @@ u32 get_index_type_size(rsx::index_array_type type)
 	fmt::throw_exception("Wrong index type");
 }
 
+namespace
+{
+	constexpr u32 max_expanded_vertices = 65536;
+
+	const std::vector<u16>& quad_index_table()
+	{
+		static const std::vector<u16> table = []
+		{
+			std::vector<u16> v(max_expanded_vertices / 4 * 6);
+			for (u32 i = 0; i < max_expanded_vertices / 4; i++)
+			{
+				v[6 * i + 0] = static_cast<u16>(4 * i + 0);
+				v[6 * i + 1] = static_cast<u16>(4 * i + 1);
+				v[6 * i + 2] = static_cast<u16>(4 * i + 2);
+				v[6 * i + 3] = static_cast<u16>(4 * i + 2);
+				v[6 * i + 4] = static_cast<u16>(4 * i + 3);
+				v[6 * i + 5] = static_cast<u16>(4 * i + 0);
+			}
+			return v;
+		}();
+
+		return table;
+	}
+
+	const std::vector<u16>& fan_index_table()
+	{
+		static const std::vector<u16> table = []
+		{
+			std::vector<u16> v((max_expanded_vertices - 2) * 3);
+			for (u32 i = 0; i < max_expanded_vertices - 2; i++)
+			{
+				v[3 * i + 0] = 0;
+				v[3 * i + 1] = static_cast<u16>(i + 1);
+				v[3 * i + 2] = static_cast<u16>(i + 2);
+			}
+			return v;
+		}();
+
+		return table;
+	}
+}
+
 void write_index_array_for_non_indexed_non_native_primitive_to_buffer(char* dst, rsx::primitive_type draw_mode, unsigned count)
 {
 	auto typedDst = reinterpret_cast<u16*>(dst);
@@ -782,6 +827,13 @@ void write_index_array_for_non_indexed_non_native_primitive_to_buffer(char* dst,
 		return;
 	case rsx::primitive_type::triangle_fan:
 	case rsx::primitive_type::polygon:
+	{
+		if (count >= 2 && count <= max_expanded_vertices) [[likely]]
+		{
+			std::memcpy(typedDst, fan_index_table().data(), (count - 2) * 3 * sizeof(u16));
+			return;
+		}
+
 		for (unsigned i = 0; i < (count - 2); i++)
 		{
 			typedDst[3 * i] = 0;
@@ -789,8 +841,18 @@ void write_index_array_for_non_indexed_non_native_primitive_to_buffer(char* dst,
 			typedDst[3 * i + 2] = i + 2;
 		}
 		return;
+	}
 	case rsx::primitive_type::quads:
-		for (unsigned i = 0; i < count / 4; i++)
+	{
+		const unsigned quads = count / 4;
+
+		if (count <= max_expanded_vertices) [[likely]]
+		{
+			std::memcpy(typedDst, quad_index_table().data(), quads * 6 * sizeof(u16));
+			return;
+		}
+
+		for (unsigned i = 0; i < quads; i++)
 		{
 			// First triangle
 			typedDst[6 * i] = 4 * i;
@@ -802,6 +864,7 @@ void write_index_array_for_non_indexed_non_native_primitive_to_buffer(char* dst,
 			typedDst[6 * i + 5] = 4 * i;
 		}
 		return;
+	}
 	case rsx::primitive_type::quad_strip:
 	case rsx::primitive_type::points:
 	case rsx::primitive_type::lines:
