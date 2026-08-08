@@ -7,6 +7,8 @@
 #include "Emu/Cell/lv2/sys_event.h"
 #include "Emu/Cell/lv2/sys_process.h"
 #include "Thread.h"
+#include <cstring>
+#include <cerrno>
 #include "Utilities/JIT.h"
 #include <cfenv>
 
@@ -1455,7 +1457,6 @@ a64_mem_info_t decode_a64_mem_inst(u32 inst)
 	// LDR Wt, label
 	// LDR Xt, label
 	// LDRSW Xt, label
-	//
 
 	// This is not needed for MMIO (which is the only use for this function)
 
@@ -3897,6 +3898,14 @@ void thread_ctrl::set_native_priority(int priority)
 	if (!SetThreadPriority(_this_thread, native_priority))
 	{
 		sig_log.error("SetThreadPriority() failed: %s", fmt::win_error{GetLastError(), nullptr});
+	}
+#elif defined(__ANDROID__)
+	const int nice_value = (priority > 0) ? -8 : (priority < 0 ? 8 : 0);
+
+	errno = 0;
+	if (setpriority(PRIO_PROCESS, static_cast<id_t>(gettid()), nice_value) == -1 && errno)
+	{
+		sig_log.warning("setpriority(%d) failed: %s", nice_value, strerror(errno));
 	}
 #else
 	int policy;
