@@ -135,6 +135,12 @@ private:
 	// Thread handle (platform-specific)
 	atomic_t<u64> m_thread{0};
 
+#ifdef ANDROID
+	// Kernel thread id. bionic refuses to be asked for the CPU clock of a thread
+	// that has already exited, so cycles are sampled by tid rather than by handle.
+	atomic_t<u32> m_native_tid{0};
+#endif
+
 	// Thread cycles
 	atomic_t<u64> m_cycles{0};
 
