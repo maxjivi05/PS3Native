@@ -2971,7 +2971,6 @@ u64 thread_base::finalize(thread_state result_state) noexcept
 	const u64 _self = m_thread;
 
 #ifdef ANDROID
-	// Stop advertising this thread to get_cycles() before it goes away
 	m_native_tid = 0;
 #endif
 
@@ -3350,13 +3349,6 @@ u64 thread_base::get_cycles()
 	clockid_t _clock;
 	struct timespec thread_time;
 #ifdef ANDROID
-	// bionic does not report an error for a thread that has already exited: it
-	// aborts the process from inside pthread_getcpuclockid(). m_thread is never
-	// cleared when a thread ends, and the performance overlay samples every
-	// emulator thread on a timer, so one exiting PPU/SPU thread would take the
-	// whole emulator down. Build the per-thread clock id from the kernel tid the
-	// same way bionic does after its handle lookup, which leaves clock_gettime()
-	// to fail for a dead thread exactly like it does on glibc.
 	const u32 native_tid = m_native_tid;
 
 	if (!handle || !native_tid)
