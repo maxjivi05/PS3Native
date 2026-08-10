@@ -3166,6 +3166,61 @@ extern "C" JNIEXPORT jstring JNICALL Java_net_rpcs3_RPCS3_patchesGet(
   return wrap(env, array.dump());
 }
 
+extern "C" JNIEXPORT jstring JNICALL Java_net_rpcs3_RPCS3_patchesAll(
+    JNIEnv *env, jobject) {
+  auto array = nlohmann::json::array();
+
+  try {
+    auto patches = loadAllPatches({});
+
+    for (const auto &[hash, container] : patches) {
+      for (const auto &[description, info] : container.patch_info_map) {
+        for (const auto &[title, serials] : info.titles) {
+          std::string serialList;
+          std::string versionList;
+
+          for (const auto &[serial, app_versions] : serials) {
+            if (!serialList.empty()) {
+              serialList += ", ";
+            }
+            serialList += serial;
+
+            for (const auto &[app_version, values] : app_versions) {
+              if (versionList.find(app_version) != std::string::npos) {
+                continue;
+              }
+              if (!versionList.empty()) {
+                versionList += ", ";
+              }
+              versionList += app_version;
+            }
+          }
+
+          array.push_back({
+              {"hash", hash},
+              {"description", description},
+              {"title", title},
+              {"serials", serialList},
+              {"appVersions", versionList},
+              {"author", info.author},
+              {"notes", info.notes},
+              {"group", info.patch_group},
+              {"patchVersion", info.patch_version},
+          });
+        }
+      }
+    }
+  } catch (const std::exception &e) {
+    rpcs3_android.error("patchesAll failed: %s", e.what());
+    return wrap(env, nlohmann::json::array().dump());
+  } catch (...) {
+    rpcs3_android.error("patchesAll failed");
+    return wrap(env, nlohmann::json::array().dump());
+  }
+
+  return wrap(env, array.dump());
+}
+
 extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcs3_RPCS3_patchSet(
     JNIEnv *env, jobject, jstring jtitleId, jstring jhash,
     jstring jdescription, jstring jtitle, jstring jserial,
