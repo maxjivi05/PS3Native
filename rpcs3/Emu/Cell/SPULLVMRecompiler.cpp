@@ -1682,14 +1682,49 @@ public:
 
 		if (func.entry_point != start0)
 		{
-			// Wait for the duplicate
 			while (!add_loc->compiled)
 			{
-				add_loc->compiled.wait(nullptr);
+				if (add_loc->llvm_compile_state == 3)
+				{
+					return nullptr;
+				}
+
+				add_loc->compiled.wait(nullptr, atomic_wait_timeout{10'000'000});
 			}
 
 			return add_loc->compiled;
 		}
+
+		if (add_loc->llvm_compile_state.compare_and_swap(0, 1) != 0)
+		{
+			while (add_loc->llvm_compile_state == 1)
+			{
+				add_loc->llvm_compile_state.wait(1);
+			}
+
+			if (add_loc->llvm_compile_state == 2)
+			{
+				return add_loc->compiled;
+			}
+
+			return nullptr;
+		}
+
+		struct claim_guard_t
+		{
+			spu_item* item;
+
+			~claim_guard_t()
+			{
+				if (item && item->llvm_compile_state == 1)
+				{
+					item->llvm_compile_state.release(3);
+					item->llvm_compile_state.notify_all();
+
+					item->compiled.notify_all();
+				}
+			}
+		} claim_guard{add_loc};
 
 		bool add_to_file = false;
 
@@ -3999,6 +4034,9 @@ public:
 		}
 
 		add_loc->compiled.notify_all();
+
+		add_loc->llvm_compile_state.release(2);
+		add_loc->llvm_compile_state.notify_all();
 
 		if (g_cfg.core.spu_debug)
 		{
