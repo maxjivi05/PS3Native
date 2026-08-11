@@ -4381,7 +4381,7 @@ bool spu_thread::process_mfc_cmd()
 							}
 
 							// Check if LSA points to an OUT buffer on the stack from a caller - unlikely to be a loop
-							if (last_getllar_lsa >= SPU_LS_SIZE - 0x10000 && last_getllar_lsa > last_getllar_gpr1)
+							if (getllar_spin_count == 0 && last_getllar_lsa >= SPU_LS_SIZE - 0x10000 && last_getllar_lsa > last_getllar_gpr1)
 							{
 								auto cs = dump_callstack_list();
 
