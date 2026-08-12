@@ -382,6 +382,8 @@ namespace
 
 			if (count >= 8)
 			{
+				static_assert(index_limit<u16>() == 0xffff);
+
 				const uint16x8_t vrestart = vdupq_n_u16(restart_index);
 				uint16x8_t vmin = vdupq_n_u16(0xffff);
 				uint16x8_t vmax = vdupq_n_u16(0);
@@ -419,6 +421,8 @@ namespace
 
 			if (count >= 4)
 			{
+				static_assert(index_limit<u32>() == 0xffffffffu);
+
 				const uint32x4_t vrestart = vdupq_n_u32(restart_index);
 				uint32x4_t vmin = vdupq_n_u32(0xffffffffu);
 				uint32x4_t vmax = vdupq_n_u32(0);
