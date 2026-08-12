@@ -233,6 +233,7 @@ DECLARE(copy_data_swap_u32) = copy_data_swap_u32_naive<false>;
 DECLARE(copy_data_swap_u32_cmp) = copy_data_swap_u32_naive<true>;
 #endif
 
+
 namespace
 {
 	template <typename T>
@@ -372,6 +373,82 @@ namespace
 			return (u64{max_index} << 32) | u64{min_index};
 		}
 
+#if defined(ARCH_ARM64)
+		static inline u64 upload_untouched_neon(const be_t<u16>* src, u16* dst, u32 count, u16 restart_index)
+		{
+			u32 i = 0;
+			u16 min_index = index_limit<u16>();
+			u16 max_index = 0;
+
+			if (count >= 8)
+			{
+				const uint16x8_t vrestart = vdupq_n_u16(restart_index);
+				uint16x8_t vmin = vdupq_n_u16(0xffff);
+				uint16x8_t vmax = vdupq_n_u16(0);
+
+				for (; i + 8 <= count; i += 8)
+				{
+					const uint16x8_t v = vreinterpretq_u16_u8(vrev16q_u8(vreinterpretq_u8_u16(
+						vld1q_u16(reinterpret_cast<const u16*>(src) + i))));
+					const uint16x8_t eq = vceqq_u16(v, vrestart);
+					const uint16x8_t v_or_ones = vorrq_u16(v, eq);
+
+					vmin = vminq_u16(vmin, v_or_ones);
+					vmax = vmaxq_u16(vmax, vbicq_u16(v, eq));
+					vst1q_u16(dst + i, v_or_ones);
+				}
+
+				min_index = vminvq_u16(vmin);
+				max_index = vmaxvq_u16(vmax);
+			}
+
+			for (; i < count; ++i)
+			{
+				const u16 index = src[i].value();
+				dst[i] = index == restart_index ? index_limit<u16>() : min_max(min_index, max_index, index);
+			}
+
+			return (u64{max_index} << 32) | u64{min_index};
+		}
+
+		static inline u64 upload_untouched_neon(const be_t<u32>* src, u32* dst, u32 count, u32 restart_index)
+		{
+			u32 i = 0;
+			u32 min_index = index_limit<u32>();
+			u32 max_index = 0;
+
+			if (count >= 4)
+			{
+				const uint32x4_t vrestart = vdupq_n_u32(restart_index);
+				uint32x4_t vmin = vdupq_n_u32(0xffffffffu);
+				uint32x4_t vmax = vdupq_n_u32(0);
+
+				for (; i + 4 <= count; i += 4)
+				{
+					const uint32x4_t v = vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(
+						vld1q_u32(reinterpret_cast<const u32*>(src) + i))));
+					const uint32x4_t eq = vceqq_u32(v, vrestart);
+					const uint32x4_t v_or_ones = vorrq_u32(v, eq);
+
+					vmin = vminq_u32(vmin, v_or_ones);
+					vmax = vmaxq_u32(vmax, vbicq_u32(v, eq));
+					vst1q_u32(dst + i, v_or_ones);
+				}
+
+				min_index = vminvq_u32(vmin);
+				max_index = vmaxvq_u32(vmax);
+			}
+
+			for (; i < count; ++i)
+			{
+				const u32 index = src[i].value();
+				dst[i] = index == restart_index ? index_limit<u32>() : min_max(min_index, max_index, index);
+			}
+
+			return (u64{max_index} << 32) | u64{min_index};
+		}
+#endif
+
 #ifdef ARCH_X64
 		template <typename T>
 		static void build_upload_untouched(asmjit::simd_builder& c, native_args& args)
@@ -450,6 +527,8 @@ namespace
 				r = upload_xi16(src.data(), dst.data(), count, restart_index);
 			else
 				r = upload_xi32(src.data(), dst.data(), count, restart_index);
+#elif defined(ARCH_ARM64)
+			r = upload_untouched_neon(src.data(), dst.data(), count, restart_index);
 #else
 			r = upload_untouched_naive(src.data(), dst.data(), count, restart_index);
 #endif
@@ -790,3 +869,4 @@ std::tuple<u32, u32, u32> write_index_array_data_to_buffer(std::span<std::byte> 
 		fmt::throw_exception("Unreachable");
 	}
 }
+
