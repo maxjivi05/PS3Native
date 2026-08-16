@@ -44,6 +44,8 @@ class RPCS3Activity : ComponentActivity() {
     private var bootThread: Thread? = null
     private val hudHandler = Handler(Looper.getMainLooper())
     private var hudPump: Runnable? = null
+    private var hudPrefsListener:
+        android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
     private val modeHoldRunnable = Runnable {
         setDrawerVisible(!drawerVisible.value)
     }
@@ -244,18 +246,44 @@ class RPCS3Activity : ComponentActivity() {
         sendGamepadData()
     }
 
-    private fun startHud() {
+    private fun applyHudPreferences() {
         val prefs = HudPrefs.of(this)
 
         if (!HudPrefs.isEnabled(prefs)) {
             binding.hudView.visibility = View.GONE
+            stopPump()
             return
         }
 
+        val wasHidden = binding.hudView.visibility != View.VISIBLE
         binding.hudView.visibility = View.VISIBLE
+        binding.hudView.setMode(HudPrefs.mode(prefs))
         binding.hudView.setElements(HudPrefs.enabledElements(prefs))
         binding.hudView.setScale(HudPrefs.scale(prefs))
-        binding.hudView.restorePosition()
+
+        if (wasHidden) {
+            binding.hudView.restorePosition()
+        }
+
+        startPump()
+    }
+
+    private fun startHud() {
+        val prefs = HudPrefs.of(this)
+
+        hudPrefsListener =
+            android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+                runOnUiThread { applyHudPreferences() }
+            }
+        prefs.registerOnSharedPreferenceChangeListener(hudPrefsListener)
+
+        applyHudPreferences()
+    }
+
+    private fun startPump() {
+        if (hudPump != null) {
+            return
+        }
 
         val reader = DeviceStatsReader(this)
 
@@ -284,9 +312,17 @@ class RPCS3Activity : ComponentActivity() {
         hudHandler.post(hudPump!!)
     }
 
-    private fun stopHud() {
+    private fun stopPump() {
         hudPump?.let { hudHandler.removeCallbacks(it) }
         hudPump = null
+    }
+
+    private fun stopHud() {
+        stopPump()
+        hudPrefsListener?.let {
+            HudPrefs.of(this).unregisterOnSharedPreferenceChangeListener(it)
+        }
+        hudPrefsListener = null
     }
 
     private fun setDrawerVisible(visible: Boolean) {

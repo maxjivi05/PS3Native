@@ -33,12 +33,30 @@ private const val COLOR_TEMP = 0xFFE53935.toInt()
 private const val COLOR_TEMP_WARM = 0xFFFFC107.toInt()
 private const val COLOR_TEMP_HOT = 0xFFFF1744.toInt()
 private const val COLOR_SEPARATOR = 0xFF616161.toInt()
+private const val COLOR_VALUE = 0xFFFFFFFF.toInt()
+
+private const val READOUT_SP = 10f
+private const val SCALE_BASE = 1.2f
 
 private const val POPUP_SURFACE = 0xFF1C1C2A.toInt()
 private const val POPUP_EDGE = 0xFF2A2A3A.toInt()
 private const val POPUP_TEXT = 0xFFF0F4FF.toInt()
 private const val POPUP_ACCENT = 0xFF1A9FFF.toInt()
 private const val POPUP_RIPPLE = 0x33A0C8FF
+
+private class SmallRaisedSpan(private val ratio: Float) :
+    android.text.style.MetricAffectingSpan() {
+
+    private fun apply(paint: android.text.TextPaint) {
+        val fullAscent = paint.ascent()
+        paint.textSize = paint.textSize * ratio
+        paint.baselineShift += (fullAscent - paint.ascent()).toInt()
+    }
+
+    override fun updateDrawState(tp: android.text.TextPaint) = apply(tp)
+
+    override fun updateMeasureState(tp: android.text.TextPaint) = apply(tp)
+}
 
 class HudView @JvmOverloads constructor(
     context: Context,
@@ -85,8 +103,10 @@ class HudView @JvmOverloads constructor(
         HudElement.entries.forEachIndexed { index, element ->
             if (index > 0) {
                 val separator = TextView(context).apply {
-                    text = "│"
+                    text = " | "
                     setTextColor(COLOR_SEPARATOR)
+                    textSize = READOUT_SP
+                    setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
                     includeFontPadding = false
                 }
                 separators.add(separator)
@@ -98,23 +118,23 @@ class HudView @JvmOverloads constructor(
 
             val readout = TextView(context).apply {
                 includeFontPadding = false
+                textSize = READOUT_SP
+                setTypeface(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
                 setTextColor(colorOf(element))
-                setShadowLayer(dp(1.5f), 0f, dp(0.5f), Color.BLACK)
+                setShadowLayer(1f, 1f, 1f, Color.BLACK)
             }
             readouts[element] = readout
             addView(readout, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
         }
 
-        applyTextSizes()
+        applyScale()
     }
 
-    private fun applyTextSizes() {
-        readouts.forEach { (element, view) ->
-            view.textSize = if (element == HudElement.Fps) 13f * scale else 10f * scale
-            view.setTypeface(view.typeface, android.graphics.Typeface.BOLD)
-            view.setPadding(dp(2f).toInt(), 0, dp(2f).toInt(), 0)
-        }
-        separators.forEach { it.textSize = 10f * scale }
+    private fun applyScale() {
+        pivotX = 0f
+        pivotY = 0f
+        scaleX = scale * SCALE_BASE
+        scaleY = scale * SCALE_BASE
     }
 
     private fun colorOf(element: HudElement) = when (element) {
@@ -129,7 +149,14 @@ class HudView @JvmOverloads constructor(
         HudElement.Temperature -> COLOR_TEMP
     }
 
+    val currentMode: HudMode
+        get() = mode
+
     fun setMode(value: HudMode) {
+        if (mode == value) {
+            return
+        }
+
         mode = value
         HudPrefs.setMode(prefs, value)
         applyMode()
@@ -151,7 +178,7 @@ class HudView @JvmOverloads constructor(
 
     fun setScale(value: Float) {
         scale = value
-        applyTextSizes()
+        applyScale()
         requestLayout()
         reanchorIfUnpinned()
     }
@@ -180,7 +207,7 @@ class HudView @JvmOverloads constructor(
             return
         }
 
-        applyAnchor(HudPrefs.anchor(prefs))
+        applyAnchor(HudPrefs.anchor(prefs), persist = false)
     }
 
     private fun applyElements() {
@@ -214,68 +241,126 @@ class HudView @JvmOverloads constructor(
         }
     }
 
+    private fun labelled(label: String, labelColor: Int, value: String): CharSequence {
+        val builder = android.text.SpannableStringBuilder()
+        builder.append(label)
+        builder.setSpan(
+            android.text.style.ForegroundColorSpan(labelColor),
+            0,
+            label.length,
+            android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+
+        val start = builder.length
+        builder.append(value)
+        builder.setSpan(
+            android.text.style.ForegroundColorSpan(COLOR_VALUE),
+            start,
+            builder.length,
+            android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+
+        return builder
+    }
+
+    private fun percentValue(value: Int) = if (value >= 0) "$value%" else "N/A"
+
     private fun render() {
         readouts[HudElement.Fps]?.text = if (sample.fps > 0f) {
-            String.format(java.util.Locale.US, "%.0f FPS", sample.fps)
+            String.format(java.util.Locale.US, "%.0f", sample.fps)
         } else {
-            "-- FPS"
+            "0"
         }
 
         readouts[HudElement.Frametime]?.text = if (sample.frametimeMs > 0f) {
             String.format(java.util.Locale.US, "%.1f ms", sample.frametimeMs)
         } else {
-            "-- ms"
+            "0.0 ms"
         }
 
-        readouts[HudElement.Renderer]?.text = sample.renderer.ifEmpty { "—" }
+        readouts[HudElement.Renderer]?.text = sample.renderer.ifEmpty { "API" }
 
-        readouts[HudElement.Gpu]?.text = percentText("GPU", sample.gpuPercent)
-        readouts[HudElement.Cpu]?.text = percentText("CPU", sample.cpuPercent)
+        readouts[HudElement.Gpu]?.text =
+            labelled("GPU ", COLOR_GPU, percentValue(sample.gpuPercent))
+        readouts[HudElement.Cpu]?.text =
+            labelled("CPU ", COLOR_CPU, percentValue(sample.cpuPercent))
 
-        readouts[HudElement.Ram]?.text = if (sample.ramUsedMb >= 0) {
-            if (sample.ramTotalMb > 0) {
-                "RAM ${sample.ramUsedMb}/${sample.ramTotalMb}MB"
-            } else {
-                "RAM ${sample.ramUsedMb}MB"
+        readouts[HudElement.Ram]?.text = labelled(
+            "RAM ",
+            COLOR_RAM,
+            when {
+                sample.ramUsedMb < 0 -> "N/A"
+                sample.ramTotalMb > 0 -> "${sample.ramUsedMb}/${sample.ramTotalMb}"
+                else -> "${sample.ramUsedMb}"
             }
-        } else {
-            "RAM --"
-        }
+        )
 
-        readouts[HudElement.Battery]?.text = if (sample.batteryPercent >= 0) {
-            "BAT ${sample.batteryPercent}%"
-        } else {
-            "BAT --"
-        }
+        readouts[HudElement.Battery]?.text = labelled(
+            "BAT ",
+            COLOR_BATTERY,
+            if (sample.batteryPercent >= 0) "${sample.batteryPercent}%" else "N/A"
+        )
 
-        readouts[HudElement.Power]?.text = if (!sample.watts.isNaN()) {
-            String.format(java.util.Locale.US, "%.1fW", sample.watts)
-        } else {
-            "--W"
-        }
+        readouts[HudElement.Power]?.text = labelled(
+            "PWR ",
+            COLOR_POWER,
+            if (!sample.watts.isNaN()) {
+                String.format(java.util.Locale.US, "%.1fw", sample.watts)
+            } else {
+                "N/A"
+            }
+        )
 
         val temp = readouts[HudElement.Temperature]
         if (temp != null) {
-            temp.text = if (sample.temperatureC >= 0) "${sample.temperatureC}°C" else "--°C"
-            temp.setTextColor(
-                when {
+            if (sample.temperatureC < 0) {
+                temp.text = labelled("TMP ", COLOR_TEMP, "N/A")
+            } else {
+                val valueColor = when {
                     sample.temperatureC >= 45 -> COLOR_TEMP_HOT
                     sample.temperatureC >= 40 -> COLOR_TEMP_WARM
-                    else -> COLOR_TEMP
+                    else -> COLOR_VALUE
                 }
-            )
+
+                val builder = android.text.SpannableStringBuilder()
+                builder.append("TMP ")
+                builder.setSpan(
+                    android.text.style.ForegroundColorSpan(COLOR_TEMP),
+                    0,
+                    builder.length,
+                    android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+
+                val start = builder.length
+                builder.append("${sample.temperatureC}°")
+                val unitStart = builder.length
+                builder.append("C")
+                builder.setSpan(
+                    android.text.style.ForegroundColorSpan(valueColor),
+                    start,
+                    builder.length,
+                    android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                builder.setSpan(
+                    SmallRaisedSpan(0.7f),
+                    unitStart,
+                    builder.length,
+                    android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+
+                temp.text = builder
+            }
         }
     }
 
-    private fun percentText(label: String, value: Int) =
-        if (value >= 0) "$label $value%" else "$label --"
-
-    fun applyAnchor(anchor: HudAnchor) {
+    fun applyAnchor(anchor: HudAnchor, persist: Boolean = true) {
         val parent = parent as? ViewGroup ?: return
 
         post {
-            val maxX = (parent.width - width).coerceAtLeast(0).toFloat()
-            val maxY = (parent.height - height).coerceAtLeast(0).toFloat()
+            val shownW = (width * scaleX).toInt()
+            val shownH = (height * scaleY).toInt()
+            val maxX = (parent.width - shownW).coerceAtLeast(0).toFloat()
+            val maxY = (parent.height - shownH).coerceAtLeast(0).toFloat()
             val margin = dp(12f)
 
             val targetX = when (anchor) {
@@ -292,7 +377,10 @@ class HudView @JvmOverloads constructor(
 
             x = targetX
             y = targetY
-            HudPrefs.setAnchor(prefs, anchor)
+
+            if (persist) {
+                HudPrefs.setAnchor(prefs, anchor)
+            }
         }
     }
 
@@ -306,14 +394,16 @@ class HudView @JvmOverloads constructor(
                 return@post
             }
 
-            applyAnchor(HudPrefs.anchor(prefs))
+            applyAnchor(HudPrefs.anchor(prefs), persist = false)
         }
     }
 
     private fun clampToParent() {
         val parent = parent as? ViewGroup ?: return
-        x = x.coerceIn(0f, (parent.width - width).coerceAtLeast(0).toFloat())
-        y = y.coerceIn(0f, (parent.height - height).coerceAtLeast(0).toFloat())
+        val shownW = (width * scaleX).toInt()
+        val shownH = (height * scaleY).toInt()
+        x = x.coerceIn(0f, (parent.width - shownW).coerceAtLeast(0).toFloat())
+        y = y.coerceIn(0f, (parent.height - shownH).coerceAtLeast(0).toFloat())
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -524,8 +614,8 @@ class HudView @JvmOverloads constructor(
         host?.getLocationOnScreen(origin)
 
         val edge = dp(8f).toInt()
-        val centreX = (x + width / 2f).toInt()
-        val centreY = (y + height / 2f).toInt()
+        val centreX = (x + width * scaleX / 2f).toInt()
+        val centreY = (y + height * scaleY / 2f).toInt()
         val posX = (centreX - popupWidth / 2).coerceIn(edge, (hostWidth - popupWidth - edge).coerceAtLeast(edge))
         val posY = (centreY - popupHeight / 2).coerceIn(edge, (hostHeight - popupHeight - edge).coerceAtLeast(edge))
 
