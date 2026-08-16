@@ -1604,13 +1604,6 @@ extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcs3_RPCS3_overlayPadData(
   for (auto &btn : pad->m_buttons) {
     if (btn.m_offset == CELL_PAD_BTN_OFFSET_DIGITAL1) {
       btn.m_pressed = (digital1 & btn.m_outKeyCode) != 0;
-
-      if (btn.m_outKeyCode == CELL_PAD_CTRL_PS && btn.m_pressed) {
-        if (auto padThread = pad::get_pad_thread(true)) {
-          padThread->open_home_menu();
-        }
-      }
-
     } else if (btn.m_offset == CELL_PAD_BTN_OFFSET_DIGITAL2) {
       btn.m_pressed = (digital2 & btn.m_outKeyCode) != 0;
     }
