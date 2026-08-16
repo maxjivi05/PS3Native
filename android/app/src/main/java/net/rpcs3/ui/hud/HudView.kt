@@ -200,8 +200,11 @@ class HudView @JvmOverloads constructor(
 
     fun submit(value: HudSample) {
         sample = value
-        graph?.addFrame(value.frametimeMs)
         render()
+    }
+
+    fun addFrameSample(ms: Float) {
+        graph?.addFrame(ms)
     }
 
     private fun applyMode() {
