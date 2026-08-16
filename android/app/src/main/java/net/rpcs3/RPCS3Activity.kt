@@ -258,6 +258,7 @@ class RPCS3Activity : ComponentActivity() {
         val wasHidden = binding.hudView.visibility != View.VISIBLE
         binding.hudView.visibility = View.VISIBLE
         binding.hudView.setMode(HudPrefs.mode(prefs))
+        binding.hudView.setFrametimeNumeric(HudPrefs.frametimeNumeric(prefs))
         binding.hudView.setElements(HudPrefs.enabledElements(prefs))
         binding.hudView.setScale(HudPrefs.scale(prefs))
 
