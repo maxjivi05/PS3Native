@@ -3,6 +3,7 @@
 #include "Emu/System.h"
 #include "Emu/Cell/SPUThread.h"
 #include "Emu/Cell/PPUThread.h"
+#include "Emu/Cell/PPUDisAsm.h"
 #include "Emu/Cell/lv2/sys_mmapper.h"
 #include "Emu/Cell/lv2/sys_event.h"
 #include "Emu/Cell/lv2/sys_process.h"
@@ -60,6 +61,10 @@ DYNAMIC_IMPORT_RENAME("Kernel32.dll", SetThreadDescriptionImport, "SetThreadDesc
 #include <sys/syscall.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
+#endif
+#ifdef __ANDROID__
+#include <android/log.h>
+#include <dlfcn.h>
 #endif
 
 #if defined(__APPLE__) || defined(__DragonFly__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
@@ -2537,9 +2542,114 @@ const bool s_exception_handler_set = []() -> bool
 
 #else
 
-static void signal_handler(int /*sig*/, siginfo_t* info, void* uct) noexcept
+#ifdef __ANDROID__
+static struct ::sigaction s_prev_fault_action[NSIG]{};
+
+static bool is_emulator_fault(void* addr)
+{
+	const u64 exec64 = (reinterpret_cast<u64>(addr) - reinterpret_cast<u64>(vm::g_exec_addr)) / 2;
+	const u64 seg_off = (reinterpret_cast<u64>(addr) - reinterpret_cast<u64>(vm::g_exec_addr)) - vm::g_exec_addr_seg_offset;
+
+	return vm::try_get_addr(addr).second || exec64 < 0x100000000ull || seg_off < 0x80000000ull;
+}
+
+using sigaction_fn = int (*)(int, const struct ::sigaction*, struct ::sigaction*);
+
+static sigaction_fn real_sigaction()
+{
+	void* const libc = ::dlopen("libc.so", RTLD_NOLOAD | RTLD_LOCAL);
+
+	return libc ? reinterpret_cast<sigaction_fn>(::dlsym(libc, "sigaction")) : nullptr;
+}
+
+static int install_fault_handler(int sig, const struct ::sigaction& sa)
+{
+	return ::sigaction(sig, &sa, sig > 0 && sig < NSIG ? &s_prev_fault_action[sig] : nullptr);
+}
+#else
+static int install_fault_handler(int sig, const struct ::sigaction& sa)
+{
+	return ::sigaction(sig, &sa, nullptr);
+}
+#endif
+
+static bool install_fault_handler_first(int sig, const struct ::sigaction& sa)
+{
+#ifdef __ANDROID__
+	if (const sigaction_fn real_sa = real_sigaction())
+	{
+		if (real_sa(sig, nullptr, &s_prev_fault_action[sig]) != -1 && real_sa(sig, &sa, nullptr) != -1)
+		{
+			char line[96];
+
+			if (::snprintf(line, sizeof(line), "sigchain: installed ahead of the runtime for signal %d", sig) > 0)
+			{
+				__android_log_write(ANDROID_LOG_INFO, "RPCS3", line);
+			}
+
+			return true;
+		}
+	}
+
+	__android_log_write(ANDROID_LOG_WARN, "RPCS3", "sigchain: could not get ahead of the runtime; it will see faults first");
+#endif
+
+	return install_fault_handler(sig, sa) != -1;
+}
+
+
+static const char* bus_error_kind(int code) noexcept
+{
+	switch (code)
+	{
+	case BUS_ADRALN: return "misaligned operand";
+	case BUS_ADRERR: return "mapped page has no backing";
+	case BUS_OBJERR: return "hardware error on the mapped object";
+	default: return "unrecognised si_code";
+	}
+}
+
+static void signal_handler(int sig, siginfo_t* info, void* uct) noexcept
 {
 	ucontext_t* context = static_cast<ucontext_t*>(uct);
+
+#ifdef __ANDROID__
+	if (!is_emulator_fault(info->si_addr))
+	{
+		static thread_local bool s_forwarding = false;
+
+		if (s_forwarding)
+		{
+			struct ::sigaction dfl{};
+			dfl.sa_handler = SIG_DFL;
+			sigemptyset(&dfl.sa_mask);
+			::sigaction(sig, &dfl, nullptr);
+			return;
+		}
+
+		const struct ::sigaction& prev = s_prev_fault_action[sig];
+		s_forwarding = true;
+
+		if ((prev.sa_flags & SA_SIGINFO) && prev.sa_sigaction)
+		{
+			prev.sa_sigaction(sig, info, uct);
+			s_forwarding = false;
+			return;
+		}
+
+		if (prev.sa_handler && prev.sa_handler != SIG_DFL && prev.sa_handler != SIG_IGN)
+		{
+			prev.sa_handler(sig);
+			s_forwarding = false;
+			return;
+		}
+
+		s_forwarding = false;
+	}
+#endif
+
+
+	const bool is_bus_error = sig == SIGBUS;
 
 #if defined(ARCH_X64)
 #ifdef __APPLE__
@@ -2598,7 +2708,9 @@ static void signal_handler(int /*sig*/, siginfo_t* info, void* uct) noexcept
 	const u64 seg_off = (reinterpret_cast<u64>(info->si_addr) - reinterpret_cast<u64>(vm::g_exec_addr)) - vm::g_exec_addr_seg_offset;
 	const auto cause = is_executing ? "executing" : is_writing ? "writing" : "reading";
 
-	if (auto [addr, ok] = vm::try_get_addr(info->si_addr); ok && !is_executing)
+	const bool try_recovery = !is_executing && !is_bus_error;
+
+	if (auto [addr, ok] = vm::try_get_addr(info->si_addr); ok && try_recovery)
 	{
 		// Try to process access violation
 		if (thread_ctrl::get_current() && handle_access_violation(addr, is_writing, false, context))
@@ -2607,14 +2719,14 @@ static void signal_handler(int /*sig*/, siginfo_t* info, void* uct) noexcept
 		}
 	}
 
-	if (exec64 < 0x100000000ull && !is_executing)
+	if (exec64 < 0x100000000ull && try_recovery)
 	{
 		if (thread_ctrl::get_current() && handle_access_violation(static_cast<u32>(exec64), is_writing, true, context))
 		{
 			return;
 		}
 	}
-	else if (seg_off < 0x80000000ull && !is_executing)
+	else if (seg_off < 0x80000000ull && try_recovery)
 	{
 		if (thread_ctrl::get_current() && handle_access_violation(static_cast<u32>(seg_off * 2), is_writing, true, context))
 		{
@@ -2622,7 +2734,57 @@ static void signal_handler(int /*sig*/, siginfo_t* info, void* uct) noexcept
 		}
 	}
 
-	std::string msg = fmt::format("Segfault %s location %p at %p.\n", cause, info->si_addr, RIP(context));
+#ifdef __ANDROID__
+	{
+		char line[256];
+		const u64 pc = RIP(context);
+
+		if (::snprintf(line, sizeof(line), "fatal signal %d (si_code %d) at %p, pc 0x%llx, tid %d",
+			sig, info->si_code, info->si_addr, static_cast<unsigned long long>(pc),
+			static_cast<int>(::syscall(__NR_gettid))) > 0)
+		{
+			__android_log_write(ANDROID_LOG_FATAL, "RPCS3", line);
+		}
+
+#if defined(ARCH_ARM64)
+		if (!is_executing && ::snprintf(line, sizeof(line), "  insn 0x%08x", *reinterpret_cast<const u32*>(pc)) > 0)
+		{
+			__android_log_write(ANDROID_LOG_FATAL, "RPCS3", line);
+		}
+
+		for (int i = 0; i < 31; i += 4)
+		{
+			char* p = line;
+			int rem = static_cast<int>(sizeof(line));
+
+			for (int j = i; j < i + 4 && j < 31; ++j)
+			{
+				const int w = ::snprintf(p, rem, "  x%d=0x%llx", j, static_cast<unsigned long long>(GPR(context, j)));
+
+				if (w <= 0 || w >= rem)
+				{
+					break;
+				}
+
+				p += w;
+				rem -= w;
+			}
+
+			__android_log_write(ANDROID_LOG_FATAL, "RPCS3", line);
+		}
+#endif
+	}
+
+	if (!vm::try_get_addr(info->si_addr).second && s_prev_fault_action[sig].sa_sigaction)
+	{
+		::sigaction(sig, &s_prev_fault_action[sig], nullptr);
+		return;
+	}
+#endif
+
+	std::string msg = sig == SIGBUS
+		? fmt::format("Bus error (%s) %s location %p at %p.\n", bus_error_kind(info->si_code), cause, info->si_addr, RIP(context))
+		: fmt::format("Segfault %s location %p at %p.\n", cause, info->si_addr, RIP(context));
 
 	if (vm::try_get_addr(info->si_addr).second)
 	{
@@ -2663,6 +2825,9 @@ static void signal_handler(int /*sig*/, siginfo_t* info, void* uct) noexcept
 #endif
 
 	sys_log.fatal("\n%s", msg);
+
+	logs::listener::sync_all();
+
 	sys_log.notice("\n%s", dump_useful_thread_info());
 	logs::listener::sync_all();
 
@@ -2707,14 +2872,14 @@ const bool s_exception_handler_set = []() -> bool
 	sigemptyset(&sa.sa_mask);
 	sa.sa_sigaction = signal_handler;
 
-	if (::sigaction(SIGSEGV, &sa, NULL) == -1)
+	if (!install_fault_handler_first(SIGSEGV, sa))
 	{
 		std::fprintf(stderr, "sigaction(SIGSEGV) failed (%d).\n", errno);
 		std::abort();
 	}
 
-#ifdef __APPLE__
-	if (::sigaction(SIGBUS, &sa, NULL) == -1)
+#if defined(__APPLE__) || defined(__ANDROID__)
+	if (!install_fault_handler_first(SIGBUS, sa))
 	{
 		std::fprintf(stderr, "sigaction(SIGBUS) failed (%d).\n", errno);
 		std::abort();
@@ -2722,7 +2887,7 @@ const bool s_exception_handler_set = []() -> bool
 #endif
 
 	sa.sa_sigaction = sigill_handler;
-	if (::sigaction(SIGILL, &sa, NULL) == -1)
+	if (install_fault_handler(SIGILL, sa) == -1)
 	{
 		std::fprintf(stderr, "sigaction(SIGILL) failed (%d).\n", errno);
 		std::abort();
