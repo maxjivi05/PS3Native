@@ -251,9 +251,6 @@ void* jit_runtime_base::_add(asmjit::CodeHolder* code, usz align) noexcept
 	}
 
 #if defined(ARCH_ARM64)
-	// Instruction-cache maintenance for freshly copied code (trampolines, branch
-	// patchpoints). Nothing flushed these before; another core could fetch stale
-	// icache contents for this range.
 	asmjit::VirtMem::flushInstructionCache(p, codeSize);
 #endif
 
@@ -341,8 +338,6 @@ void jit_runtime::finalize() noexcept
 	pthread_jit_write_protect_np(true);
 #endif
 #ifdef ARCH_ARM64
-	// The restored range is executable code rewritten in place: perform real
-	// instruction-cache maintenance for it (ISB/DSB alone cleans nothing).
 	if (code_ptr && !s_code_init.empty())
 	{
 		asmjit::VirtMem::flushInstructionCache(code_ptr, s_code_init.size());
