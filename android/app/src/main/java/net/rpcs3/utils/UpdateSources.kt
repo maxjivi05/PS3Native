@@ -58,12 +58,8 @@ object UpdateSources {
     private const val PSN_URL =
         "https://a0.ww.np.dl.playstation.net/tpl/np/{TITLEID}/{TITLEID}-ver.xml"
 
-    private const val ALDO_NAME = "Aldo's PS3 update index"
-    private const val ALDO_URL = "https://ps3.aldostools.org/updates.html"
-
     fun defaults() = listOf(
-        UpdateSource(PSN_NAME, PSN_URL, UpdateSourceFormat.SonyVerXml),
-        UpdateSource(ALDO_NAME, ALDO_URL, UpdateSourceFormat.IndexHtml, insecureTls = true)
+        UpdateSource(PSN_NAME, PSN_URL, UpdateSourceFormat.SonyVerXml)
     )
 
     fun normalize(
