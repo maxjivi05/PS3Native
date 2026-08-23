@@ -446,7 +446,7 @@ DECLARE(spu_runtime::tr_all) = []
 }();
 
 #if defined(ARCH_ARM64)
-static constexpr u32 s_spu_scratchpad_size = 32768;
+static constexpr u32 s_spu_scratchpad_size = 262144;
 #endif
 
 DECLARE(spu_runtime::g_gateway) = build_function_asm<spu_function_t>("spu_gateway", [](native_asm& c, auto& args)

@@ -2953,6 +2953,14 @@ void thread_base::start()
 	pthread_attr_setschedpolicy(&attrs, SCHED_RR);
 	pthread_attr_setschedparam(&attrs, &sp);
 	ensure(pthread_create(&thread_id, &attrs, entry_point, this) == 0);
+#elif defined(__ANDROID__)
+	pthread_t thread_id{};
+	pthread_attr_t attrs;
+	pthread_attr_init(&attrs);
+	pthread_attr_setstacksize(&attrs, 0x800000);
+	const int thread_rc = pthread_create(&thread_id, &attrs, entry_point, this);
+	pthread_attr_destroy(&attrs);
+	ensure(thread_rc == 0);
 #else
 	pthread_t thread_id{};
 	ensure(pthread_create(&thread_id, nullptr, entry_point, this) == 0);
