@@ -364,6 +364,25 @@ namespace vk
 				return driver_vendor::ARM_MALI;
 			}
 
+			if (gpu_name.find("Turnip") != umax)
+			{
+				return driver_vendor::TURNIP;
+			}
+			else if (gpu_name.find("Adreno") != umax)
+			{
+				return driver_vendor::ADRENO;
+			}
+
+			if (gpu_name.find("PowerVR") != umax || gpu_name.find("Imagination") != umax)
+			{
+				return driver_vendor::POWERVR;
+			}
+
+			if (gpu_name.find("Xclipse") != umax || gpu_name.find("Samsung") != umax)
+			{
+				return driver_vendor::XCLIPSE;
+			}
+
 			return driver_vendor::unknown;
 		}
 		else
@@ -395,8 +414,20 @@ namespace vk
 				return driver_vendor::PANVK;
 			case VK_DRIVER_ID_ARM_PROPRIETARY:
 				return driver_vendor::ARM_MALI;
+			case VK_DRIVER_ID_QUALCOMM_PROPRIETARY:
+				return driver_vendor::ADRENO;
+			case VK_DRIVER_ID_MESA_TURNIP:
+				return driver_vendor::TURNIP;
+			case VK_DRIVER_ID_IMAGINATION_PROPRIETARY:
+			case VK_DRIVER_ID_IMAGINATION_OPEN_SOURCE_MESA:
+				return driver_vendor::POWERVR;
+			case VK_DRIVER_ID_SAMSUNG_PROPRIETARY:
+				return driver_vendor::XCLIPSE;
+			case VK_DRIVER_ID_BROADCOM_PROPRIETARY:
+				return driver_vendor::BROADCOM;
+			case VK_DRIVER_ID_VERISILICON_PROPRIETARY:
+				return driver_vendor::VERISILICON;
 			default:
-				// Mobile?
 				return driver_vendor::unknown;
 			}
 		}
