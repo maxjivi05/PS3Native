@@ -276,6 +276,24 @@ namespace vk
 			// Disable fp16 if driver uses LLVM emitter. It does fine with AMD proprietary drivers though.
 			shader_types_support.allow_float16 = (driver_properties.driverID == VK_DRIVER_ID_AMD_PROPRIETARY_KHR);
 		}
+
+		constexpr u32 s_adreno_fp16_min_driver = (512u << 22) | (676u << 12) | 53u;
+		const auto mobile_vendor = get_driver_vendor();
+		const bool mobile_fp16_ok =
+			mobile_vendor == driver_vendor::TURNIP ||
+			(mobile_vendor == driver_vendor::ADRENO && props.driverVersion >= s_adreno_fp16_min_driver);
+
+		if (!mobile_fp16_ok && is_MOBILE(mobile_vendor) && shader_types_support.allow_float16)
+		{
+			rsx_log.warning("Mobile GPU: disabling native float16 shader types (driver shader compiler rejects them).");
+			shader_types_support.allow_float16 = false;
+		}
+
+		if (optional_features_support.conditional_rendering && is_ADRENO(mobile_vendor))
+		{
+			rsx_log.notice("Conditional rendering disabled: unreliable on this driver (device loss on Turnip, unbounded render pass allocations on Adreno).");
+			optional_features_support.conditional_rendering = false;
+		}
 	}
 
 	std::string physical_device::get_name() const
