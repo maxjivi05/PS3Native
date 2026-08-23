@@ -58,6 +58,7 @@ DYNAMIC_IMPORT_RENAME("Kernel32.dll", SetThreadDescriptionImport, "SetThreadDesc
 #include <time.h>
 #endif
 #ifdef __linux__
+#include <fcntl.h>
 #include <sys/syscall.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
@@ -3759,10 +3760,68 @@ void thread_ctrl::silent_exit() noexcept
 	std::abort();
 }
 
+#if defined(ARCH_ARM64) && defined(__linux__)
+static const std::array<u32, 64>& get_arm_core_capacities()
+{
+	static const std::array<u32, 64> s_caps = []
+	{
+		std::array<u32, 64> caps{};
+
+		for (u32 core = 0; core < 64u; core++)
+		{
+			char path[128];
+			std::snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu%u/cpu_capacity", core);
+
+			const int fd = ::open(path, O_RDONLY | O_CLOEXEC);
+			if (fd < 0)
+			{
+				continue;
+			}
+
+			char buf[32]{};
+			const auto got = ::read(fd, buf, sizeof(buf) - 1);
+			::close(fd);
+
+			if (got > 0)
+			{
+				caps[core] = static_cast<u32>(std::atoi(buf));
+			}
+		}
+
+		return caps;
+	}();
+
+	return s_caps;
+}
+#endif
+
 void thread_ctrl::detect_cpu_layout()
 {
 	if (!g_native_core_layout.compare_and_swap_test(native_core_arrangement::undefined, native_core_arrangement::generic))
 		return;
+
+#if defined(ARCH_ARM64) && defined(__linux__)
+	{
+		const auto& caps = get_arm_core_capacities();
+		u32 lowest = umax, highest = 0;
+
+		for (u32 core = 0; core < 64u; core++)
+		{
+			if (caps[core])
+			{
+				lowest = std::min(lowest, caps[core]);
+				highest = std::max(highest, caps[core]);
+			}
+		}
+
+		if (highest && lowest != umax && highest > lowest)
+		{
+			sig_log.notice("Detected ARM heterogeneous CPU (capacity %u..%u)", lowest, highest);
+			g_native_core_layout.store(native_core_arrangement::arm_big_little);
+			return;
+		}
+	}
+#endif
 
 	const auto system_id = utils::get_cpu_brand();
 	if (system_id.find("Ryzen") != umax)
@@ -3863,6 +3922,72 @@ u64 thread_ctrl::get_affinity_mask(thread_class group)
 		{
 			return all_cores_mask;
 		}
+#if defined(ARCH_ARM64) && defined(__linux__)
+		case native_core_arrangement::arm_big_little:
+		{
+			const auto& caps = get_arm_core_capacities();
+			u64 fast_mask = 0;
+			u64 slow_mask = 0;
+			u32 threshold = 0;
+
+			for (u32 core = 0; core < 64u; core++)
+			{
+				threshold = std::max(threshold, caps[core]);
+			}
+
+			threshold = threshold * 3 / 4;
+
+			for (u32 core = 0; core < 64u; core++)
+			{
+				if (~process_affinity_mask & (u64{1} << core))
+				{
+					continue;
+				}
+
+				const u32 capacity = caps[core];
+
+				((capacity && capacity >= threshold) ? fast_mask : slow_mask) |= (u64{1} << core);
+			}
+
+			if (!fast_mask || !slow_mask)
+			{
+				return all_cores_mask;
+			}
+
+			u64 prime_mask = 0;
+			u32 best_capacity = 0;
+
+			for (u32 core = 0; core < 64u; core++)
+			{
+				if (~fast_mask & (u64{1} << core))
+				{
+					continue;
+				}
+
+				if (caps[core] > best_capacity)
+				{
+					best_capacity = caps[core];
+					prime_mask = (u64{1} << core);
+				}
+			}
+
+			const u64 spu_mask = (std::popcount(fast_mask & ~prime_mask) > 1)
+				? (fast_mask & ~prime_mask)
+				: fast_mask;
+
+			switch (group)
+			{
+			case thread_class::spu:
+				return spu_mask;
+			case thread_class::rsx:
+				return fast_mask;
+			case thread_class::ppu:
+				return all_cores_mask;
+			default:
+				return slow_mask;
+			}
+		}
+#endif
 		case native_core_arrangement::amd_ccx:
 		{
 			if (thread_count <= 8)
