@@ -7496,7 +7496,11 @@ public:
 		const auto known_idx = get_known_bits(c);
 		const bool perm_only = known_idx.Zero[7];
 		const bool perm_or_zero_only = known_idx.Zero[6];
+#ifdef ARCH_ARM64
+		const bool idx_selects_single = false;
+#else
 		const bool idx_selects_single = known_idx.extractBits(1, 4).isConstant();
+#endif
 
 		const auto a = get_vr<u8[16]>(op.ra);
 		const auto b = get_vr<u8[16]>(op.rb);
@@ -7511,6 +7515,13 @@ public:
 		const bool a_is_splat = a_is_const && a_data == v128::from8p(a_data._u8[0]);
 		const bool b_is_splat = b_is_const && b_data == v128::from8p(b_data._u8[0]);
 
+#ifdef ARCH_ARM64
+		const bool a_fold_const = a_is_splat;
+		const bool b_fold_const = b_is_splat;
+#else
+		const bool a_fold_const = a_is_const;
+		const bool b_fold_const = b_is_const;
+#endif
 
 		auto get_swap_from_const = [this](v128 data, bool is_splat) {
 			// Splats are their own byteswap
@@ -7520,15 +7531,15 @@ public:
 			return make_const_vector(data, get_type<u8[16]>());
 		};
 
-		if (a_is_const)
+		if (a_fold_const)
 			a_swap.value = get_swap_from_const(a_data, a_is_splat);
 
-		if (b_is_const)
+		if (b_fold_const)
 			b_swap.value = get_swap_from_const(b_data, b_is_splat);
 
 		// Shuffle index reversal is equivalent to a byteswap
 		value_t<u8[16]> av, bv, cv;
-		if ((a_was_swapped || a_is_const) && (b_was_swapped || b_is_const))
+		if ((a_was_swapped || a_fold_const) && (b_was_swapped || b_fold_const))
 		{
 			av = eval(a_swap);
 			bv = eval(b_swap);
