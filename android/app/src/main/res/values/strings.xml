@@ -483,6 +483,7 @@
     <string name="framegen_section_source">Shader source</string>
     <string name="framegen_section_generation">Generation</string>
     <string name="framegen_section_status">Status</string>
+    <string name="framegen_section_manage">Shader DLL</string>
     <string name="framegen_label_pacing">Pacing</string>
     <string name="framegen_label_multiplier">Multiplier</string>
     <string name="framegen_label_target">Target rate</string>

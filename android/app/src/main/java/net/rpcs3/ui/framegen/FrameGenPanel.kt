@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -91,35 +90,181 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Dimens.SectionGap)
     ) {
-    SettingsSection(title = stringResource(R.string.framegen_section_source)) {
-        SettingGroup {
-            Text(
-                text = when {
-                    importing -> stringResource(R.string.framegen_source_importing)
-                    state.imported && state.sourceName.isNotEmpty() ->
-                        stringResource(
-                            R.string.framegen_source_loaded_named,
-                            state.sourceName,
-                            state.modules,
-                            state.variant
+        SettingsSection(title = stringResource(R.string.framegen_section_source)) {
+            SettingGroup {
+                Text(
+                    text = when {
+                        importing -> stringResource(R.string.framegen_source_importing)
+                        state.imported && state.sourceName.isNotEmpty() ->
+                            stringResource(
+                                R.string.framegen_source_loaded_named,
+                                state.sourceName,
+                                state.modules,
+                                state.variant
+                            )
+
+                        state.imported ->
+                            stringResource(
+                                R.string.framegen_source_loaded,
+                                state.modules,
+                                state.variant
+                            )
+
+                        else -> stringResource(R.string.framegen_source_missing)
+                    },
+                    color = if (state.imported) Rpcs.TextPrimary else Rpcs.TextSecondary,
+                    fontSize = Dimens.ValueSize,
+                    fontWeight = if (state.imported) FontWeight.Medium else FontWeight.Normal,
+                    lineHeight = 16.sp
+                )
+            }
+        }
+
+        SettingsSection(title = stringResource(R.string.framegen_section_generation)) {
+            SettingGroup {
+                SettingSwitch(
+                    label = stringResource(R.string.framegen_enable),
+                    subtitle = stringResource(
+                        if (state.imported) {
+                            R.string.framegen_enable_hint
+                        } else {
+                            R.string.framegen_enable_blocked
+                        }
+                    ),
+                    checked = enabled && state.imported,
+                    enabled = state.imported,
+                    onCheckedChange = { wanted ->
+                        enabled = wanted
+                        FrameGenPrefs.setEnabled(prefs, wanted)
+                        FrameGen.push(context)
+                    }
+                )
+
+                ThinDivider()
+
+                LabelledChipRow(label = stringResource(R.string.framegen_label_pacing)) {
+                    FrameGenMode.entries.forEach { candidate ->
+                        SettingChip(
+                            label = stringResource(
+                                if (candidate == FrameGenMode.Fixed) {
+                                    R.string.framegen_mode_fixed
+                                } else {
+                                    R.string.framegen_mode_adaptive
+                                }
+                            ),
+                            detail = stringResource(
+                                if (candidate == FrameGenMode.Fixed) {
+                                    R.string.framegen_mode_fixed_detail
+                                } else {
+                                    R.string.framegen_mode_adaptive_detail
+                                }
+                            ),
+                            selected = candidate == mode,
+                            enabled = state.imported,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                mode = candidate
+                                FrameGenPrefs.setMode(prefs, candidate)
+                                FrameGen.push(context)
+                            }
+                        )
+                    }
+                }
+
+                ThinDivider()
+
+                if (mode == FrameGenMode.Fixed) {
+                    LabelledChipRow(label = stringResource(R.string.framegen_label_multiplier)) {
+                        Multipliers.forEach { candidate ->
+                            SettingChip(
+                                label = stringResource(
+                                    R.string.framegen_multiplier_value,
+                                    candidate
+                                ),
+                                detail = stringResource(
+                                    R.string.framegen_multiplier_detail,
+                                    candidate - 1
+                                ),
+                                selected = candidate == multiplier,
+                                enabled = state.imported,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    multiplier = candidate
+                                    FrameGenPrefs.setMultiplier(prefs, candidate)
+                                    FrameGen.push(context)
+                                }
+                            )
+                        }
+                    }
+                } else {
+                    LabelledChipRow(label = stringResource(R.string.framegen_label_target)) {
+                        TargetRates.forEach { candidate ->
+                            SettingChip(
+                                label = stringResource(R.string.framegen_target_value, candidate),
+                                detail = stringResource(R.string.framegen_target_detail),
+                                selected = candidate == targetRate,
+                                enabled = state.imported,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    targetRate = candidate
+                                    FrameGenPrefs.setTargetRate(prefs, candidate)
+                                    FrameGen.push(context)
+                                }
+                            )
+                        }
+                    }
+                }
+
+                ThinDivider()
+
+                SettingSlider(
+                    label = stringResource(R.string.framegen_label_flow),
+                    value = flowScale.toFloat(),
+                    valueRange = 25f..100f,
+                    steps = 14,
+                    valueText = stringResource(R.string.percent_value, flowScale),
+                    enabled = state.imported,
+                    onValueChange = { flowScale = it.toInt() },
+                    onValueChangeFinished = {
+                        FrameGenPrefs.setFlowScale(prefs, flowScale)
+                        FrameGen.push(context)
+                    }
+                )
+            }
+
+            SettingsHint(text = stringResource(R.string.framegen_flow_hint))
+        }
+
+        SettingsSection(title = stringResource(R.string.framegen_section_status)) {
+            SettingGroup {
+                Text(
+                    text = when {
+                        state.unsupported -> stringResource(R.string.framegen_runtime_unsupported)
+                        state.ready -> stringResource(
+                            R.string.framegen_runtime_active,
+                            state.width,
+                            state.height
                         )
 
-                    state.imported ->
-                        stringResource(
-                            R.string.framegen_source_loaded,
-                            state.modules,
-                            state.variant
-                        )
+                        else -> stringResource(R.string.framegen_runtime_idle)
+                    },
+                    color = when {
+                        state.unsupported -> Rpcs.Warning
+                        state.ready -> Rpcs.Success
+                        else -> Rpcs.TextSecondary
+                    },
+                    fontSize = Dimens.ValueSize,
+                    lineHeight = 16.sp
+                )
+            }
 
-                    else -> stringResource(R.string.framegen_source_missing)
-                },
-                color = if (state.imported) Rpcs.TextPrimary else Rpcs.TextSecondary,
-                fontSize = Dimens.ValueSize,
-                fontWeight = if (state.imported) FontWeight.Medium else FontWeight.Normal,
-                lineHeight = 16.sp
-            )
+            SettingsHint(text = stringResource(R.string.framegen_latency_note))
+        }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        SettingsSection(title = stringResource(R.string.framegen_section_manage)) {
+            SettingsHint(text = stringResource(R.string.framegen_source_hint))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.ItemGap)) {
                 GhostButton(
                     label = stringResource(
                         if (state.imported) {
@@ -152,150 +297,6 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
                 }
             }
         }
-
-        SettingsHint(text = stringResource(R.string.framegen_source_hint))
-    }
-
-    SettingsSection(title = stringResource(R.string.framegen_section_generation)) {
-        SettingGroup {
-            SettingSwitch(
-                label = stringResource(R.string.framegen_enable),
-                subtitle = stringResource(
-                    if (state.imported) {
-                        R.string.framegen_enable_hint
-                    } else {
-                        R.string.framegen_enable_blocked
-                    }
-                ),
-                checked = enabled && state.imported,
-                enabled = state.imported,
-                onCheckedChange = { wanted ->
-                    enabled = wanted
-                    FrameGenPrefs.setEnabled(prefs, wanted)
-                    FrameGen.push(context)
-                }
-            )
-
-            ThinDivider()
-
-            LabelledChipRow(label = stringResource(R.string.framegen_label_pacing)) {
-                FrameGenMode.entries.forEach { candidate ->
-                    SettingChip(
-                        label = stringResource(
-                            if (candidate == FrameGenMode.Fixed) {
-                                R.string.framegen_mode_fixed
-                            } else {
-                                R.string.framegen_mode_adaptive
-                            }
-                        ),
-                        detail = stringResource(
-                            if (candidate == FrameGenMode.Fixed) {
-                                R.string.framegen_mode_fixed_detail
-                            } else {
-                                R.string.framegen_mode_adaptive_detail
-                            }
-                        ),
-                        selected = candidate == mode,
-                        enabled = state.imported,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            mode = candidate
-                            FrameGenPrefs.setMode(prefs, candidate)
-                            FrameGen.push(context)
-                        }
-                    )
-                }
-            }
-
-            ThinDivider()
-
-            if (mode == FrameGenMode.Fixed) {
-                LabelledChipRow(label = stringResource(R.string.framegen_label_multiplier)) {
-                    Multipliers.forEach { candidate ->
-                        SettingChip(
-                            label = stringResource(
-                                R.string.framegen_multiplier_value,
-                                candidate
-                            ),
-                            detail = stringResource(
-                                R.string.framegen_multiplier_detail,
-                                candidate - 1
-                            ),
-                            selected = candidate == multiplier,
-                            enabled = state.imported,
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                multiplier = candidate
-                                FrameGenPrefs.setMultiplier(prefs, candidate)
-                                FrameGen.push(context)
-                            }
-                        )
-                    }
-                }
-            } else {
-                LabelledChipRow(label = stringResource(R.string.framegen_label_target)) {
-                    TargetRates.forEach { candidate ->
-                        SettingChip(
-                            label = stringResource(R.string.framegen_target_value, candidate),
-                            detail = stringResource(R.string.framegen_target_detail),
-                            selected = candidate == targetRate,
-                            enabled = state.imported,
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                targetRate = candidate
-                                FrameGenPrefs.setTargetRate(prefs, candidate)
-                                FrameGen.push(context)
-                            }
-                        )
-                    }
-                }
-            }
-
-            ThinDivider()
-
-            SettingSlider(
-                label = stringResource(R.string.framegen_label_flow),
-                value = flowScale.toFloat(),
-                valueRange = 25f..100f,
-                steps = 14,
-                valueText = stringResource(R.string.percent_value, flowScale),
-                enabled = state.imported,
-                onValueChange = { flowScale = it.toInt() },
-                onValueChangeFinished = {
-                    FrameGenPrefs.setFlowScale(prefs, flowScale)
-                    FrameGen.push(context)
-                }
-            )
-        }
-
-        SettingsHint(text = stringResource(R.string.framegen_flow_hint))
-    }
-
-    SettingsSection(title = stringResource(R.string.framegen_section_status)) {
-        SettingGroup {
-            Text(
-                text = when {
-                    state.unsupported -> stringResource(R.string.framegen_runtime_unsupported)
-                    state.ready -> stringResource(
-                        R.string.framegen_runtime_active,
-                        state.width,
-                        state.height
-                    )
-
-                    else -> stringResource(R.string.framegen_runtime_idle)
-                },
-                color = when {
-                    state.unsupported -> Rpcs.Warning
-                    state.ready -> Rpcs.Success
-                    else -> Rpcs.TextSecondary
-                },
-                fontSize = Dimens.ValueSize,
-                lineHeight = 16.sp
-            )
-        }
-
-        SettingsHint(text = stringResource(R.string.framegen_latency_note))
-    }
     }
 }
 
