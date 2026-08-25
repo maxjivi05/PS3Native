@@ -36,7 +36,9 @@ data class FrameGenState(
     val ready: Boolean = false,
     val unsupported: Boolean = false,
     val width: Int = 0,
-    val height: Int = 0
+    val height: Int = 0,
+    val flowWidth: Int = 0,
+    val flowHeight: Int = 0
 )
 
 object FrameGenPrefs {
@@ -134,7 +136,9 @@ object FrameGen {
             ready = raw?.optBoolean("ready", false) == true,
             unsupported = raw?.optBoolean("unsupported", false) == true,
             width = raw?.optInt("width", 0) ?: 0,
-            height = raw?.optInt("height", 0) ?: 0
+            height = raw?.optInt("height", 0) ?: 0,
+            flowWidth = raw?.optInt("flowWidth", 0) ?: 0,
+            flowHeight = raw?.optInt("flowHeight", 0) ?: 0
         )
 
         state.value = result

@@ -28,6 +28,8 @@ namespace vk
 		bool unsupported = false;
 		u32 width = 0;
 		u32 height = 0;
+		u32 flow_width = 0;
+		u32 flow_height = 0;
 	};
 
 	void set_frame_generation_shader_cache(std::string path);
@@ -64,7 +66,7 @@ namespace vk
 
 		bool is_usable() const { return m_shaders_ready && !m_unavailable; }
 
-		void set_guest_extent(u32 width, u32 height, u32 output_width, u32 output_height);
+		void set_guest_extent(u32 width, u32 height);
 
 		bool prepare(u32 width, u32 height);
 

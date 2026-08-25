@@ -56,7 +56,7 @@ void VKGSRender::discard_generated_frames()
 }
 
 void VKGSRender::run_frame_generation(VkImage target_image, VkImageLayout target_layout, VkImageLayout present_layout,
-	u32 source_width, u32 source_height, u32 content_width, u32 content_height)
+	u32 guest_width, u32 guest_height)
 {
 	discard_generated_frames();
 
@@ -85,7 +85,7 @@ void VKGSRender::run_frame_generation(VkImage target_image, VkImageLayout target
 	const u32 width = m_swapchain_dims.width;
 	const u32 height = m_swapchain_dims.height;
 
-	m_frame_generator->set_guest_extent(source_width, source_height, content_width, content_height);
+	m_frame_generator->set_guest_extent(guest_width, guest_height);
 
 	if (!m_frame_generator->prepare(width, height))
 	{
@@ -708,6 +708,9 @@ void VKGSRender::flip(const rsx::display_flip_info_t& info)
 			buffer_pitch = buffer_width * 4;
 	}
 
+	const u32 guest_width = buffer_width;
+	const u32 guest_height = buffer_height;
+
 	// Scan memory for required data. This is done early to optimize waiting for the driver image acquire below.
 	vk::viewable_image* image_to_flip = nullptr;
 	vk::viewable_image* image_to_flip2 = nullptr;
@@ -1148,8 +1151,7 @@ void VKGSRender::flip(const rsx::display_flip_info_t& info)
 	}
 
 #ifdef ANDROID
-	run_frame_generation(target_image, target_layout, present_layout, buffer_width, buffer_height,
-		static_cast<u32>(aspect_ratio.width()), static_cast<u32>(aspect_ratio.height()));
+	run_frame_generation(target_image, target_layout, present_layout, guest_width, guest_height);
 #endif
 
 	if (target_layout != present_layout)

@@ -180,7 +180,6 @@ namespace vk
 
 		VkExtent2D built_extent{};
 		VkExtent2D peak_guest_extent{};
-		VkExtent2D peak_output_extent{};
 		VkFormat built_format = VK_FORMAT_UNDEFINED;
 		float built_flow_scale = 0.f;
 
@@ -192,19 +191,19 @@ namespace vk
 		bool warm = false;
 		bool generating = false;
 
-		float effective_flow_scale(const frame_generation_settings& settings) const
+		float effective_flow_scale(const frame_generation_settings& settings, u32 output_width) const
 		{
 			if (!settings.flow_scale_auto)
 			{
 				return std::clamp(settings.flow_scale_percent / 100.f, flow_scale_min, flow_scale_max);
 			}
 
-			if (!peak_guest_extent.width || !peak_output_extent.width)
+			if (!peak_guest_extent.width || !output_width)
 			{
 				return flow_scale_max;
 			}
 
-			const float ratio = static_cast<float>(peak_guest_extent.width) / static_cast<float>(peak_output_extent.width);
+			const float ratio = static_cast<float>(peak_guest_extent.width) / static_cast<float>(output_width);
 			const float stepped = std::ceil(ratio * flow_scale_steps) / flow_scale_steps;
 			return std::clamp(stepped, flow_scale_min, flow_scale_max);
 		}
@@ -294,17 +293,15 @@ namespace vk
 		return m_present_semaphores[image_index];
 	}
 
-	void frame_generator::set_guest_extent(u32 width, u32 height, u32 output_width, u32 output_height)
+	void frame_generator::set_guest_extent(u32 width, u32 height)
 	{
-		if (!m_impl || !width || !height || !output_width || !output_height)
+		if (!m_impl || !width || !height)
 		{
 			return;
 		}
 
 		m_impl->peak_guest_extent.width = std::max(m_impl->peak_guest_extent.width, width);
 		m_impl->peak_guest_extent.height = std::max(m_impl->peak_guest_extent.height, height);
-		m_impl->peak_output_extent.width = std::max(m_impl->peak_output_extent.width, output_width);
-		m_impl->peak_output_extent.height = std::max(m_impl->peak_output_extent.height, output_height);
 	}
 
 	bool frame_generator::prepare(u32 width, u32 height)
@@ -317,7 +314,7 @@ namespace vk
 		}
 
 		const auto settings = get_frame_generation_settings();
-		const float flow_scale = m_impl->effective_flow_scale(settings);
+		const float flow_scale = m_impl->effective_flow_scale(settings, width);
 
 		lsfg::LsfgPacerConfig pacer_config;
 		pacer_config.multiplier = settings.multiplier;
@@ -377,11 +374,14 @@ namespace vk
 		m_impl->generating = false;
 		m_impl->pacer.Reset();
 
-		set_frame_generation_status({ .ready = true, .unsupported = false, .width = width, .height = height });
-		rsx_log.notice("Frame generation: chain built at %ux%u, flow %ux%u scale %.2f (%s, guest %ux%u into %ux%u)",
-			width, height, static_cast<u32>(width * flow_scale), static_cast<u32>(height * flow_scale), flow_scale,
-			settings.flow_scale_auto ? "auto" : "manual", m_impl->peak_guest_extent.width, m_impl->peak_guest_extent.height,
-			m_impl->peak_output_extent.width, m_impl->peak_output_extent.height);
+		const u32 flow_width = static_cast<u32>(width * flow_scale);
+		const u32 flow_height = static_cast<u32>(height * flow_scale);
+
+		set_frame_generation_status({ .ready = true, .unsupported = false, .width = width, .height = height,
+			.flow_width = flow_width, .flow_height = flow_height });
+		rsx_log.notice("Frame generation: chain built at %ux%u, motion at %ux%u scale %.2f (%s, game renders %ux%u)",
+			width, height, flow_width, flow_height, flow_scale, settings.flow_scale_auto ? "auto" : "manual",
+			m_impl->peak_guest_extent.width, m_impl->peak_guest_extent.height);
 		return true;
 	}
 
@@ -517,7 +517,6 @@ namespace vk
 
 		m_impl->pacer.Reset();
 		m_impl->peak_guest_extent = VkExtent2D{};
-		m_impl->peak_output_extent = VkExtent2D{};
 		m_impl->warm_streak = 0;
 		m_impl->warm = false;
 		m_impl->generating = false;

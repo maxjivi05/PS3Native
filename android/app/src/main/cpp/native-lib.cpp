@@ -1929,12 +1929,13 @@ extern "C" JNIEXPORT jstring JNICALL Java_net_rpcs3_RPCS3_frameGenState(
 
   return wrap(env, fmt::format(
                        R"({"imported":%s,"status":%d,"variant":"%s","modules":%u,)"
-                       R"("sourceSize":%u,"ready":%s,"unsupported":%s,"width":%u,"height":%u})",
+                       R"("sourceSize":%u,"ready":%s,"unsupported":%s,"width":%u,"height":%u,)"
+                       R"("flowWidth":%u,"flowHeight":%u})",
                        imported ? "true" : "false", static_cast<int>(status),
                        lsfg_variant_name(info.variant), info.module_count,
                        info.source_size, runtime.ready ? "true" : "false",
                        runtime.unsupported ? "true" : "false", runtime.width,
-                       runtime.height));
+                       runtime.height, runtime.flow_width, runtime.flow_height));
 }
 
 extern "C" JNIEXPORT void JNICALL Java_net_rpcs3_RPCS3_frameGenConfigure(

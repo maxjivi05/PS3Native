@@ -526,6 +526,7 @@
     <string name="framegen_flow_hint">Lower values cost less GPU time and soften fast motion.</string>
 
     <string name="framegen_runtime_active">Running at %1$d × %2$d.</string>
+    <string name="framegen_runtime_active_motion">Running at %1$d × %2$d, motion searched at %3$d × %4$d.</string>
     <string name="framegen_runtime_idle">Starts once a game is running.</string>
     <string name="framegen_runtime_unsupported">This GPU rejected the frame generation pipelines, so it stays off.</string>
     <string name="framegen_latency_note">Interpolation always adds a little latency: the real frame is held back while the frames before it are shown. It buys smoothness, not response.</string>
