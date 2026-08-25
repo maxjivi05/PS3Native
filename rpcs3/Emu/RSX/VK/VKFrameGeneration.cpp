@@ -377,8 +377,9 @@ namespace vk
 		const u32 flow_width = static_cast<u32>(width * flow_scale);
 		const u32 flow_height = static_cast<u32>(height * flow_scale);
 
-		set_frame_generation_status({ .ready = true, .unsupported = false, .width = width, .height = height,
-			.flow_width = flow_width, .flow_height = flow_height });
+		set_frame_generation_status({ .ready = true, .unsupported = false, .flow_auto = settings.flow_scale_auto,
+			.width = width, .height = height, .flow_width = flow_width, .flow_height = flow_height,
+			.guest_width = m_impl->peak_guest_extent.width, .guest_height = m_impl->peak_guest_extent.height });
 		rsx_log.notice("Frame generation: chain built at %ux%u, motion at %ux%u scale %.2f (%s, game renders %ux%u)",
 			width, height, flow_width, flow_height, flow_scale, settings.flow_scale_auto ? "auto" : "manual",
 			m_impl->peak_guest_extent.width, m_impl->peak_guest_extent.height);

@@ -277,8 +277,18 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
                 Text(
                     text = when {
                         state.unsupported -> stringResource(R.string.framegen_runtime_unsupported)
+                        state.ready && state.flowWidth > 0 && state.flowAuto -> stringResource(
+                            R.string.framegen_runtime_active_auto,
+                            state.width,
+                            state.height,
+                            state.guestWidth,
+                            state.guestHeight,
+                            state.flowWidth,
+                            state.flowHeight
+                        )
+
                         state.ready && state.flowWidth > 0 -> stringResource(
-                            R.string.framegen_runtime_active_motion,
+                            R.string.framegen_runtime_active_manual,
                             state.width,
                             state.height,
                             state.flowWidth,

@@ -38,7 +38,10 @@ data class FrameGenState(
     val width: Int = 0,
     val height: Int = 0,
     val flowWidth: Int = 0,
-    val flowHeight: Int = 0
+    val flowHeight: Int = 0,
+    val guestWidth: Int = 0,
+    val guestHeight: Int = 0,
+    val flowAuto: Boolean = false
 )
 
 object FrameGenPrefs {
@@ -138,7 +141,10 @@ object FrameGen {
             width = raw?.optInt("width", 0) ?: 0,
             height = raw?.optInt("height", 0) ?: 0,
             flowWidth = raw?.optInt("flowWidth", 0) ?: 0,
-            flowHeight = raw?.optInt("flowHeight", 0) ?: 0
+            flowHeight = raw?.optInt("flowHeight", 0) ?: 0,
+            guestWidth = raw?.optInt("guestWidth", 0) ?: 0,
+            guestHeight = raw?.optInt("guestHeight", 0) ?: 0,
+            flowAuto = raw?.optBoolean("flowAuto", false) == true
         )
 
         state.value = result
