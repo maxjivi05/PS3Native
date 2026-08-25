@@ -47,6 +47,7 @@ object FrameGenPrefs {
     private const val KEY_MULTIPLIER = "multiplier"
     private const val KEY_TARGET_RATE = "target_rate"
     private const val KEY_FLOW_SCALE = "flow_scale"
+    private const val KEY_FLOW_SCALE_AUTO = "flow_scale_auto"
     private const val KEY_SOURCE_NAME = "source_name"
     private const val KEY_IMPORTED_AT = "imported_at"
 
@@ -82,10 +83,16 @@ object FrameGenPrefs {
     }
 
     fun flowScale(prefs: SharedPreferences) =
-        prefs.getInt(KEY_FLOW_SCALE, 100).coerceIn(25, 100)
+        prefs.getInt(KEY_FLOW_SCALE, 70).coerceIn(25, 100)
 
     fun setFlowScale(prefs: SharedPreferences, value: Int) {
         prefs.edit().putInt(KEY_FLOW_SCALE, value.coerceIn(25, 100)).apply()
+    }
+
+    fun flowScaleAuto(prefs: SharedPreferences) = prefs.getBoolean(KEY_FLOW_SCALE_AUTO, true)
+
+    fun setFlowScaleAuto(prefs: SharedPreferences, value: Boolean) {
+        prefs.edit().putBoolean(KEY_FLOW_SCALE_AUTO, value).apply()
     }
 
     fun sourceName(prefs: SharedPreferences): String = prefs.getString(KEY_SOURCE_NAME, "").orEmpty()
@@ -142,8 +149,15 @@ object FrameGen {
             FrameGenPrefs.isEnabled(prefs) && state.value.imported,
             FrameGenPrefs.multiplier(prefs),
             if (adaptive) FrameGenPrefs.targetRate(prefs) else 0,
-            FrameGenPrefs.flowScale(prefs)
+            FrameGenPrefs.flowScale(prefs),
+            FrameGenPrefs.flowScaleAuto(prefs)
         )
+    }
+
+    fun pushRefreshRate(hz: Float) {
+        if (hz > 0f) {
+            RPCS3.instance.frameGenSetRefreshRate(hz)
+        }
     }
 
     fun sync(context: Context) {

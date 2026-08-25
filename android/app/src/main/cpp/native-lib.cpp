@@ -1939,13 +1939,19 @@ extern "C" JNIEXPORT jstring JNICALL Java_net_rpcs3_RPCS3_frameGenState(
 
 extern "C" JNIEXPORT void JNICALL Java_net_rpcs3_RPCS3_frameGenConfigure(
     JNIEnv *, jobject, jboolean enabled, jint multiplier, jint targetRate,
-    jint flowScalePercent) {
+    jint flowScalePercent, jboolean flowScaleAuto) {
   vk::frame_generation_settings settings{};
   settings.enabled = enabled == JNI_TRUE;
+  settings.flow_scale_auto = flowScaleAuto == JNI_TRUE;
   settings.multiplier = static_cast<u32>(std::max<jint>(multiplier, 2));
   settings.target_rate = static_cast<u32>(std::max<jint>(targetRate, 0));
   settings.flow_scale_percent = static_cast<u32>(std::max<jint>(flowScalePercent, 25));
   vk::set_frame_generation_settings(settings);
+}
+
+extern "C" JNIEXPORT void JNICALL Java_net_rpcs3_RPCS3_frameGenSetRefreshRate(
+    JNIEnv *, jobject, jfloat hz) {
+  vk::set_frame_generation_refresh_rate(static_cast<float>(hz));
 }
 
 extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcs3_RPCS3_frameGenForget(

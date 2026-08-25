@@ -55,7 +55,8 @@ void VKGSRender::discard_generated_frames()
 	m_generated_signal_semaphores.clear();
 }
 
-void VKGSRender::run_frame_generation(VkImage target_image, VkImageLayout target_layout, VkImageLayout present_layout)
+void VKGSRender::run_frame_generation(VkImage target_image, VkImageLayout target_layout, VkImageLayout present_layout,
+	u32 source_width, u32 source_height, u32 content_width, u32 content_height)
 {
 	discard_generated_frames();
 
@@ -84,22 +85,22 @@ void VKGSRender::run_frame_generation(VkImage target_image, VkImageLayout target
 	const u32 width = m_swapchain_dims.width;
 	const u32 height = m_swapchain_dims.height;
 
+	m_frame_generator->set_guest_extent(source_width, source_height, content_width, content_height);
+
 	if (!m_frame_generator->prepare(width, height))
 	{
 		return;
 	}
 
-	m_frame_generator->plan(m_reserved_swap_images);
-	m_frame_generator->process(*m_current_command_buffer, target_image, target_layout, width, height);
-
-	const u32 wanted = std::min(m_frame_generator->generated_count(), m_reserved_swap_images);
+	const u32 wanted = std::min(m_frame_generator->plan(m_reserved_swap_images), m_reserved_swap_images);
+	const u64 acquire_timeout = vk::frame_generation_acquire_timeout();
 
 	for (u32 i = 0; i < wanted; ++i)
 	{
 		const VkSemaphore acquire_semaphore = m_frame_generator->next_acquire_semaphore();
 		u32 image_index = umax;
 
-		const VkResult status = m_swapchain->acquire_next_swapchain_image(acquire_semaphore, 8000000ull, &image_index);
+		const VkResult status = m_swapchain->acquire_next_swapchain_image(acquire_semaphore, acquire_timeout, &image_index);
 
 		if (status != VK_SUCCESS && status != VK_SUBOPTIMAL_KHR)
 		{
@@ -110,6 +111,9 @@ void VKGSRender::run_frame_generation(VkImage target_image, VkImageLayout target
 		m_generated_wait_semaphores.push_back(acquire_semaphore);
 		m_generated_signal_semaphores.push_back(m_frame_generator->present_semaphore(image_index));
 	}
+
+	m_frame_generator->process(*m_current_command_buffer, target_image, target_layout, width, height,
+		::size32(m_generated_present_images));
 
 	for (usz i = 0; i < m_generated_present_images.size(); ++i)
 	{
@@ -1144,7 +1148,8 @@ void VKGSRender::flip(const rsx::display_flip_info_t& info)
 	}
 
 #ifdef ANDROID
-	run_frame_generation(target_image, target_layout, present_layout);
+	run_frame_generation(target_image, target_layout, present_layout, buffer_width, buffer_height,
+		static_cast<u32>(aspect_ratio.width()), static_cast<u32>(aspect_ratio.height()));
 #endif
 
 	if (target_layout != present_layout)

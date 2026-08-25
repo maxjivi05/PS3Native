@@ -487,7 +487,8 @@
     <string name="framegen_label_pacing">Pacing</string>
     <string name="framegen_label_multiplier">Multiplier</string>
     <string name="framegen_label_target">Target rate</string>
-    <string name="framegen_label_flow">Motion search resolution</string>
+    <string name="framegen_label_flow">Motion search</string>
+    <string name="framegen_label_flow_scale">Motion search resolution</string>
     <string name="framegen_source_missing">No shader source imported yet. Pick your own copy of Lossless.dll to enable frame generation.</string>
     <string name="framegen_source_importing">Reading the shader chain out of the file…</string>
     <string name="framegen_source_loaded">Loaded — %1$d shaders (%2$s)</string>
@@ -517,6 +518,11 @@
     <string name="framegen_multiplier_detail">+%1$d frames</string>
     <string name="framegen_target_value">%1$d fps</string>
     <string name="framegen_target_detail">up to 4×</string>
+    <string name="framegen_flow_auto">Auto</string>
+    <string name="framegen_flow_auto_detail">match the game</string>
+    <string name="framegen_flow_manual">Manual</string>
+    <string name="framegen_flow_manual_detail">fixed scale</string>
+    <string name="framegen_flow_auto_hint">Motion is searched at the resolution the game renders, so upscaling costs nothing extra.</string>
     <string name="framegen_flow_hint">Lower values cost less GPU time and soften fast motion.</string>
 
     <string name="framegen_runtime_active">Running at %1$d × %2$d.</string>

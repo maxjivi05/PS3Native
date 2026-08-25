@@ -16,9 +16,10 @@ namespace vk
 	struct frame_generation_settings
 	{
 		bool enabled = false;
+		bool flow_scale_auto = true;
 		u32 multiplier = 2;
 		u32 target_rate = 0;
-		u32 flow_scale_percent = 100;
+		u32 flow_scale_percent = 70;
 	};
 
 	struct frame_generation_status
@@ -37,6 +38,10 @@ namespace vk
 
 	void set_frame_generation_settings(const frame_generation_settings& settings);
 	frame_generation_settings get_frame_generation_settings();
+
+	void set_frame_generation_refresh_rate(float hz);
+	float frame_generation_refresh_rate();
+	u64 frame_generation_acquire_timeout();
 
 	u32 frame_generation_reserved_images();
 
@@ -59,13 +64,13 @@ namespace vk
 
 		bool is_usable() const { return m_shaders_ready && !m_unavailable; }
 
+		void set_guest_extent(u32 width, u32 height, u32 output_width, u32 output_height);
+
 		bool prepare(u32 width, u32 height);
 
 		u32 plan(u32 capacity);
 
-		void process(VkCommandBuffer cmd, VkImage source, VkImageLayout source_layout, u32 width, u32 height);
-
-		u32 generated_count() const;
+		void process(VkCommandBuffer cmd, VkImage source, VkImageLayout source_layout, u32 width, u32 height, u32 generations);
 
 		void emit(VkCommandBuffer cmd, u32 index, VkImage target, VkImageLayout present_layout, u32 width, u32 height);
 

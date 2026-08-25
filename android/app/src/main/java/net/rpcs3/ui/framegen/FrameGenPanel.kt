@@ -60,6 +60,7 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
     var multiplier by remember { mutableIntStateOf(FrameGenPrefs.multiplier(prefs)) }
     var targetRate by remember { mutableIntStateOf(FrameGenPrefs.targetRate(prefs)) }
     var flowScale by remember { mutableIntStateOf(FrameGenPrefs.flowScale(prefs)) }
+    var flowScaleAuto by remember { mutableStateOf(FrameGenPrefs.flowScaleAuto(prefs)) }
     var importing by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { FrameGen.refresh(context) }
@@ -217,22 +218,58 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
 
                 ThinDivider()
 
-                SettingSlider(
-                    label = stringResource(R.string.framegen_label_flow),
-                    value = flowScale.toFloat(),
-                    valueRange = 25f..100f,
-                    steps = 14,
-                    valueText = stringResource(R.string.percent_value, flowScale),
-                    enabled = state.imported,
-                    onValueChange = { flowScale = it.toInt() },
-                    onValueChangeFinished = {
-                        FrameGenPrefs.setFlowScale(prefs, flowScale)
-                        FrameGen.push(context)
-                    }
-                )
+                LabelledChipRow(label = stringResource(R.string.framegen_label_flow)) {
+                    SettingChip(
+                        label = stringResource(R.string.framegen_flow_auto),
+                        detail = stringResource(R.string.framegen_flow_auto_detail),
+                        selected = flowScaleAuto,
+                        enabled = state.imported,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            flowScaleAuto = true
+                            FrameGenPrefs.setFlowScaleAuto(prefs, true)
+                            FrameGen.push(context)
+                        }
+                    )
+
+                    SettingChip(
+                        label = stringResource(R.string.framegen_flow_manual),
+                        detail = stringResource(R.string.framegen_flow_manual_detail),
+                        selected = !flowScaleAuto,
+                        enabled = state.imported,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            flowScaleAuto = false
+                            FrameGenPrefs.setFlowScaleAuto(prefs, false)
+                            FrameGen.push(context)
+                        }
+                    )
+                }
+
+                if (!flowScaleAuto) {
+                    ThinDivider()
+
+                    SettingSlider(
+                        label = stringResource(R.string.framegen_label_flow_scale),
+                        value = flowScale.toFloat(),
+                        valueRange = 25f..100f,
+                        steps = 14,
+                        valueText = stringResource(R.string.percent_value, flowScale),
+                        enabled = state.imported,
+                        onValueChange = { flowScale = it.toInt() },
+                        onValueChangeFinished = {
+                            FrameGenPrefs.setFlowScale(prefs, flowScale)
+                            FrameGen.push(context)
+                        }
+                    )
+                }
             }
 
-            SettingsHint(text = stringResource(R.string.framegen_flow_hint))
+            SettingsHint(
+                text = stringResource(
+                    if (flowScaleAuto) R.string.framegen_flow_auto_hint else R.string.framegen_flow_hint
+                )
+            )
         }
 
         SettingsSection(title = stringResource(R.string.framegen_section_status)) {

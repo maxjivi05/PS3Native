@@ -211,7 +211,8 @@ private:
 	u32 m_requested_swap_reserve = 0;
 	u64 m_frame_generation_revision = 0;
 
-	void run_frame_generation(VkImage target_image, VkImageLayout target_layout, VkImageLayout present_layout);
+	void run_frame_generation(VkImage target_image, VkImageLayout target_layout, VkImageLayout present_layout,
+		u32 source_width, u32 source_height, u32 content_width, u32 content_height);
 	void present_generated_frames();
 	void discard_generated_frames();
 #endif

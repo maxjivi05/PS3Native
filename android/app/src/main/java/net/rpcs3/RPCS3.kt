@@ -127,7 +127,14 @@ class RPCS3 {
     external fun supportsCustomDriverLoading() : Boolean
     external fun frameGenImport(fd: Int, cachePath: String): Int
     external fun frameGenState(cachePath: String): String
-    external fun frameGenConfigure(enabled: Boolean, multiplier: Int, targetRate: Int, flowScalePercent: Int)
+    external fun frameGenConfigure(
+        enabled: Boolean,
+        multiplier: Int,
+        targetRate: Int,
+        flowScalePercent: Int,
+        flowScaleAuto: Boolean
+    )
+    external fun frameGenSetRefreshRate(hz: Float)
     external fun frameGenForget(cachePath: String): Boolean
     external fun isInstallableFile(fd: Int) : Boolean
     external fun getDirInstallPath(sfoFd: Int) : String?
