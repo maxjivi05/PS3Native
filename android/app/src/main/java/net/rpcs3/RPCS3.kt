@@ -131,8 +131,7 @@ class RPCS3 {
         enabled: Boolean,
         multiplier: Int,
         targetRate: Int,
-        flowScalePercent: Int,
-        flowScaleAuto: Boolean
+        flowScalePercent: Int
     )
     external fun frameGenSetRefreshRate(hz: Float)
     external fun frameGenForget(cachePath: String): Boolean

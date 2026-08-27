@@ -193,19 +193,16 @@ namespace vk
 
 		float effective_flow_scale(const frame_generation_settings& settings, u32 output_width) const
 		{
-			if (!settings.flow_scale_auto)
-			{
-				return std::clamp(settings.flow_scale_percent / 100.f, flow_scale_min, flow_scale_max);
-			}
+			const float preset = std::clamp(settings.flow_scale_percent / 100.f, flow_scale_min, flow_scale_max);
 
 			if (!peak_guest_extent.width || !output_width)
 			{
-				return flow_scale_max;
+				return preset;
 			}
 
 			const float ratio = static_cast<float>(peak_guest_extent.width) / static_cast<float>(output_width);
 			const float stepped = std::ceil(ratio * flow_scale_steps) / flow_scale_steps;
-			return std::clamp(stepped, flow_scale_min, flow_scale_max);
+			return std::clamp(std::min(stepped, preset), flow_scale_min, flow_scale_max);
 		}
 	};
 
@@ -377,11 +374,11 @@ namespace vk
 		const u32 flow_width = static_cast<u32>(width * flow_scale);
 		const u32 flow_height = static_cast<u32>(height * flow_scale);
 
-		set_frame_generation_status({ .ready = true, .unsupported = false, .flow_auto = settings.flow_scale_auto,
-			.width = width, .height = height, .flow_width = flow_width, .flow_height = flow_height,
+		set_frame_generation_status({ .ready = true, .unsupported = false, .width = width, .height = height,
+			.flow_width = flow_width, .flow_height = flow_height,
 			.guest_width = m_impl->peak_guest_extent.width, .guest_height = m_impl->peak_guest_extent.height });
-		rsx_log.notice("Frame generation: chain built at %ux%u, motion at %ux%u scale %.2f (%s, game renders %ux%u)",
-			width, height, flow_width, flow_height, flow_scale, settings.flow_scale_auto ? "auto" : "manual",
+		rsx_log.notice("Frame generation: chain built at %ux%u, motion at %ux%u scale %.2f (preset %.2f, game outputs %ux%u)",
+			width, height, flow_width, flow_height, flow_scale, settings.flow_scale_percent / 100.f,
 			m_impl->peak_guest_extent.width, m_impl->peak_guest_extent.height);
 		return true;
 	}
@@ -410,11 +407,12 @@ namespace vk
 		if ((m_impl->plan_calls++ % telemetry_interval) == 0)
 		{
 			const lsfg::LsfgPacerStats stats = m_impl->pacer.Stats();
+			const float wanted = stats.source_rate * static_cast<float>(m_impl->plan.generations + 1);
 			rsx_log.notice("Frame generation: gen=%zu max=%zu cap=%u guest=%.1f loop=%.1f refresh=%.1f target=%.0f "
-				"slots=%.2f cost=%zu fails=%u%s%s%s%s",
+				"slots=%.2f needs=%.1fHz%s%s",
 				m_impl->plan.generations, m_impl->pacer.MaxGenerations(), capacity, stats.source_rate, stats.loop_rate,
-				stats.refresh_rate, stats.target_rate, stats.slots, stats.cost_ceiling, stats.cost_failures,
-				stats.probing ? " probing" : "", stats.settling ? " settling" : "", stats.backing_off ? " backoff" : "",
+				stats.refresh_rate, stats.target_rate, stats.slots, wanted,
+				(stats.refresh_rate > 0.f && wanted > stats.refresh_rate + 1.f) ? " PANEL-BOUND" : "",
 				stats.rates_settled ? (m_impl->warm ? "" : " cold") : " sampling");
 		}
 

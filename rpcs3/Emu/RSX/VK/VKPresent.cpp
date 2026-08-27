@@ -133,10 +133,23 @@ void VKGSRender::present_generated_frames()
 		if (status == VK_SUCCESS || status == VK_SUBOPTIMAL_KHR)
 		{
 			vk::frame_generation_count_presented(1);
+			continue;
 		}
-		else
+
+		if (status == VK_ERROR_OUT_OF_DATE_KHR || status == VK_ERROR_SURFACE_LOST_KHR)
 		{
-			rsx_log.warning("Frame generation: presenting an interpolated frame returned %d", static_cast<s32>(status));
+			swapchain_unavailable = true;
+
+			if (status == VK_ERROR_SURFACE_LOST_KHR)
+			{
+				surface_lost = true;
+			}
+		}
+
+		if ((m_generated_present_failures++ % 120) == 0)
+		{
+			rsx_log.warning("Frame generation: presenting an interpolated frame returned %d (failures=%llu)",
+				static_cast<s32>(status), m_generated_present_failures);
 		}
 	}
 

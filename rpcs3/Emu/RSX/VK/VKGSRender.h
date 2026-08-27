@@ -209,6 +209,7 @@ private:
 	std::vector<VkSemaphore> m_generated_signal_semaphores;
 	u32 m_reserved_swap_images = 0;
 	u32 m_requested_swap_reserve = 0;
+	u64 m_generated_present_failures = 0;
 	u64 m_frame_generation_revision = 0;
 
 	void run_frame_generation(VkImage target_image, VkImageLayout target_layout, VkImageLayout present_layout,

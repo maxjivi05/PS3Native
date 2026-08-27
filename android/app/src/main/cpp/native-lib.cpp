@@ -1930,23 +1930,20 @@ extern "C" JNIEXPORT jstring JNICALL Java_net_rpcs3_RPCS3_frameGenState(
   return wrap(env, fmt::format(
                        R"({"imported":%s,"status":%d,"variant":"%s","modules":%u,)"
                        R"("sourceSize":%u,"ready":%s,"unsupported":%s,"width":%u,"height":%u,)"
-                       R"("flowWidth":%u,"flowHeight":%u,"guestWidth":%u,"guestHeight":%u,)"
-                       R"("flowAuto":%s})",
+                       R"("flowWidth":%u,"flowHeight":%u,"guestWidth":%u,"guestHeight":%u})",
                        imported ? "true" : "false", static_cast<int>(status),
                        lsfg_variant_name(info.variant), info.module_count,
                        info.source_size, runtime.ready ? "true" : "false",
                        runtime.unsupported ? "true" : "false", runtime.width,
                        runtime.height, runtime.flow_width, runtime.flow_height,
-                       runtime.guest_width, runtime.guest_height,
-                       runtime.flow_auto ? "true" : "false"));
+                       runtime.guest_width, runtime.guest_height));
 }
 
 extern "C" JNIEXPORT void JNICALL Java_net_rpcs3_RPCS3_frameGenConfigure(
     JNIEnv *, jobject, jboolean enabled, jint multiplier, jint targetRate,
-    jint flowScalePercent, jboolean flowScaleAuto) {
+    jint flowScalePercent) {
   vk::frame_generation_settings settings{};
   settings.enabled = enabled == JNI_TRUE;
-  settings.flow_scale_auto = flowScaleAuto == JNI_TRUE;
   settings.multiplier = static_cast<u32>(std::max<jint>(multiplier, 2));
   settings.target_rate = static_cast<u32>(std::max<jint>(targetRate, 0));
   settings.flow_scale_percent = static_cast<u32>(std::max<jint>(flowScalePercent, 25));

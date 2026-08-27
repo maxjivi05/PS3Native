@@ -16,7 +16,6 @@ namespace vk
 	struct frame_generation_settings
 	{
 		bool enabled = false;
-		bool flow_scale_auto = true;
 		u32 multiplier = 2;
 		u32 target_rate = 0;
 		u32 flow_scale_percent = 70;
@@ -26,7 +25,6 @@ namespace vk
 	{
 		bool ready = false;
 		bool unsupported = false;
-		bool flow_auto = false;
 		u32 width = 0;
 		u32 height = 0;
 		u32 flow_width = 0;

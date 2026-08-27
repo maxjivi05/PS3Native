@@ -484,11 +484,8 @@
     <string name="framegen_section_generation">Generation</string>
     <string name="framegen_section_status">Status</string>
     <string name="framegen_section_manage">Shader DLL</string>
-    <string name="framegen_label_pacing">Pacing</string>
     <string name="framegen_label_multiplier">Multiplier</string>
     <string name="framegen_label_target">Target rate</string>
-    <string name="framegen_label_flow">Motion search</string>
-    <string name="framegen_label_flow_scale">Motion search resolution</string>
     <string name="framegen_source_missing">No shader source imported yet. Pick your own copy of Lossless.dll to enable frame generation.</string>
     <string name="framegen_source_importing">Reading the shader chain out of the file…</string>
     <string name="framegen_source_loaded">Loaded — %1$d shaders (%2$s)</string>
@@ -510,24 +507,29 @@
     <string name="framegen_enable">Frame generation</string>
     <string name="framegen_enable_hint">Interpolates extra frames between rendered ones</string>
     <string name="framegen_enable_blocked">Import Lossless.dll first</string>
-    <string name="framegen_mode_fixed">Fixed</string>
-    <string name="framegen_mode_fixed_detail">set multiplier</string>
-    <string name="framegen_mode_adaptive">Adaptive</string>
-    <string name="framegen_mode_adaptive_detail">hold a rate</string>
     <string name="framegen_multiplier_value">%1$d×</string>
     <string name="framegen_multiplier_detail">+%1$d frames</string>
     <string name="framegen_target_value">%1$d fps</string>
     <string name="framegen_target_detail">up to 4×</string>
-    <string name="framegen_flow_auto">Auto</string>
-    <string name="framegen_flow_auto_detail">match the game</string>
-    <string name="framegen_flow_manual">Manual</string>
-    <string name="framegen_flow_manual_detail">fixed scale</string>
-    <string name="framegen_flow_auto_hint">Motion is searched at the resolution the game renders, so upscaling costs nothing extra.</string>
-    <string name="framegen_flow_hint">Lower values cost less GPU time and soften fast motion.</string>
 
+    <string name="framegen_label_preset">Quality preset</string>
+    <string name="framegen_target_off">Off</string>
+    <string name="framegen_target_off_detail">use multiplier</string>
+    <string name="framegen_target_note">The multiplier is chosen each frame to hold the rate you picked.</string>
+    <string name="framegen_preset_ultra_performance">Ultra Performance</string>
+    <string name="framegen_preset_performance">Performance</string>
+    <string name="framegen_preset_balanced">Balanced</string>
+    <string name="framegen_preset_quality">Quality</string>
+    <string name="framegen_preset_ultra_performance_short">Ultra</string>
+    <string name="framegen_preset_performance_short">Perf</string>
+    <string name="framegen_preset_balanced_short">Balanced</string>
+    <string name="framegen_preset_quality_short">Quality</string>
+    <string name="framegen_preset_ultra_performance_note" formatted="false">Motion estimated at 40% resolution. Around 40% of Quality\'s GPU cost. Fine detail softens during fast motion.</string>
+    <string name="framegen_preset_performance_note" formatted="false">Motion estimated at 50% resolution. Around 46% of Quality\'s GPU cost, with almost no visible loss.</string>
+    <string name="framegen_preset_balanced_note" formatted="false">Motion estimated at 70% resolution. Around 61% of Quality\'s GPU cost. Recommended for handhelds.</string>
+    <string name="framegen_preset_quality_note" formatted="false">Motion estimated at full resolution. Highest cost; use it only when the game has GPU headroom to spare.</string>
+    <string name="framegen_runtime_active_motion">Running at %1$d \u00d7 %2$d. The game outputs %3$d \u00d7 %4$d, so motion is searched at %5$d \u00d7 %6$d.</string>
     <string name="framegen_runtime_active">Running at %1$d × %2$d.</string>
-    <string name="framegen_runtime_active_auto">Running at %1$d × %2$d. The game outputs %3$d × %4$d, so motion is searched at %5$d × %6$d.</string>
-    <string name="framegen_runtime_active_manual">Running at %1$d × %2$d, motion searched at %3$d × %4$d from your fixed scale.</string>
     <string name="framegen_runtime_idle">Starts once a game is running.</string>
     <string name="framegen_runtime_unsupported">This GPU rejected the frame generation pipelines, so it stays off.</string>
     <string name="framegen_latency_note">Interpolation always adds a little latency: the real frame is held back while the frames before it are shown. It buys smoothness, not response.</string>

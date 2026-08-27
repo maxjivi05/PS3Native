@@ -22,7 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -30,8 +32,8 @@ import net.rpcs3.R
 import net.rpcs3.dialogs.AlertDialogQueue
 import net.rpcs3.framegen.FrameGen
 import net.rpcs3.framegen.FrameGenImportResult
-import net.rpcs3.framegen.FrameGenMode
 import net.rpcs3.framegen.FrameGenPrefs
+import net.rpcs3.framegen.FrameGenPreset
 import net.rpcs3.ui.components.GhostButton
 import net.rpcs3.ui.components.SettingChip
 import net.rpcs3.ui.components.SettingGroup
@@ -45,7 +47,7 @@ import net.rpcs3.ui.theme.Rpcs
 
 const val FrameGenCategory = "Frame Gen"
 
-private val TargetRates = listOf(60, 90, 120, 144)
+private val TargetRates = listOf(60, 90, 120)
 private val Multipliers = listOf(2, 3, 4)
 
 @Composable
@@ -56,11 +58,9 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
     val state by FrameGen.state
 
     var enabled by remember { mutableStateOf(FrameGenPrefs.isEnabled(prefs)) }
-    var mode by remember { mutableStateOf(FrameGenPrefs.mode(prefs)) }
     var multiplier by remember { mutableIntStateOf(FrameGenPrefs.multiplier(prefs)) }
     var targetRate by remember { mutableIntStateOf(FrameGenPrefs.targetRate(prefs)) }
-    var flowScale by remember { mutableIntStateOf(FrameGenPrefs.flowScale(prefs)) }
-    var flowScaleAuto by remember { mutableStateOf(FrameGenPrefs.flowScaleAuto(prefs)) }
+    var preset by remember { mutableStateOf(FrameGenPrefs.preset(prefs)) }
     var importing by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { FrameGen.refresh(context) }
@@ -143,29 +143,30 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
 
                 ThinDivider()
 
-                LabelledChipRow(label = stringResource(R.string.framegen_label_pacing)) {
-                    FrameGenMode.entries.forEach { candidate ->
+                LabelledChipRow(label = stringResource(R.string.framegen_label_target)) {
+                    SettingChip(
+                        label = stringResource(R.string.framegen_target_off),
+                        detail = stringResource(R.string.framegen_target_off_detail),
+                        selected = targetRate == 0,
+                        enabled = state.imported,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            targetRate = 0
+                            FrameGenPrefs.setTargetRate(prefs, 0)
+                            FrameGen.push(context)
+                        }
+                    )
+
+                    TargetRates.forEach { candidate ->
                         SettingChip(
-                            label = stringResource(
-                                if (candidate == FrameGenMode.Fixed) {
-                                    R.string.framegen_mode_fixed
-                                } else {
-                                    R.string.framegen_mode_adaptive
-                                }
-                            ),
-                            detail = stringResource(
-                                if (candidate == FrameGenMode.Fixed) {
-                                    R.string.framegen_mode_fixed_detail
-                                } else {
-                                    R.string.framegen_mode_adaptive_detail
-                                }
-                            ),
-                            selected = candidate == mode,
+                            label = stringResource(R.string.framegen_target_value, candidate),
+                            detail = stringResource(R.string.framegen_target_detail),
+                            selected = candidate == targetRate,
                             enabled = state.imported,
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                mode = candidate
-                                FrameGenPrefs.setMode(prefs, candidate)
+                                targetRate = candidate
+                                FrameGenPrefs.setTargetRate(prefs, candidate)
                                 FrameGen.push(context)
                             }
                         )
@@ -174,7 +175,7 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
 
                 ThinDivider()
 
-                if (mode == FrameGenMode.Fixed) {
+                if (targetRate == 0) {
                     LabelledChipRow(label = stringResource(R.string.framegen_label_multiplier)) {
                         Multipliers.forEach { candidate ->
                             SettingChip(
@@ -198,78 +199,23 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
                         }
                     }
                 } else {
-                    LabelledChipRow(label = stringResource(R.string.framegen_label_target)) {
-                        TargetRates.forEach { candidate ->
-                            SettingChip(
-                                label = stringResource(R.string.framegen_target_value, candidate),
-                                detail = stringResource(R.string.framegen_target_detail),
-                                selected = candidate == targetRate,
-                                enabled = state.imported,
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    targetRate = candidate
-                                    FrameGenPrefs.setTargetRate(prefs, candidate)
-                                    FrameGen.push(context)
-                                }
-                            )
-                        }
-                    }
+                    SettingsHint(text = stringResource(R.string.framegen_target_note))
                 }
 
                 ThinDivider()
 
-                LabelledChipRow(label = stringResource(R.string.framegen_label_flow)) {
-                    SettingChip(
-                        label = stringResource(R.string.framegen_flow_auto),
-                        detail = stringResource(R.string.framegen_flow_auto_detail),
-                        selected = flowScaleAuto,
-                        enabled = state.imported,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            flowScaleAuto = true
-                            FrameGenPrefs.setFlowScaleAuto(prefs, true)
-                            FrameGen.push(context)
-                        }
-                    )
-
-                    SettingChip(
-                        label = stringResource(R.string.framegen_flow_manual),
-                        detail = stringResource(R.string.framegen_flow_manual_detail),
-                        selected = !flowScaleAuto,
-                        enabled = state.imported,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            flowScaleAuto = false
-                            FrameGenPrefs.setFlowScaleAuto(prefs, false)
-                            FrameGen.push(context)
-                        }
-                    )
-                }
-
-                if (!flowScaleAuto) {
-                    ThinDivider()
-
-                    SettingSlider(
-                        label = stringResource(R.string.framegen_label_flow_scale),
-                        value = flowScale.toFloat(),
-                        valueRange = 25f..100f,
-                        steps = 14,
-                        valueText = stringResource(R.string.percent_value, flowScale),
-                        enabled = state.imported,
-                        onValueChange = { flowScale = it.toInt() },
-                        onValueChangeFinished = {
-                            FrameGenPrefs.setFlowScale(prefs, flowScale)
-                            FrameGen.push(context)
-                        }
-                    )
-                }
+                PresetRow(
+                    selected = preset,
+                    enabled = state.imported,
+                    onSelected = { chosen ->
+                        preset = chosen
+                        FrameGenPrefs.setPreset(prefs, chosen)
+                        FrameGen.push(context)
+                    }
+                )
             }
 
-            SettingsHint(
-                text = stringResource(
-                    if (flowScaleAuto) R.string.framegen_flow_auto_hint else R.string.framegen_flow_hint
-                )
-            )
+            SettingsHint(text = stringResource(preset.descriptionRes))
         }
 
         SettingsSection(title = stringResource(R.string.framegen_section_status)) {
@@ -277,20 +223,12 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
                 Text(
                     text = when {
                         state.unsupported -> stringResource(R.string.framegen_runtime_unsupported)
-                        state.ready && state.flowWidth > 0 && state.flowAuto -> stringResource(
-                            R.string.framegen_runtime_active_auto,
+                        state.ready && state.flowWidth > 0 && state.guestWidth > 0 -> stringResource(
+                            R.string.framegen_runtime_active_motion,
                             state.width,
                             state.height,
                             state.guestWidth,
                             state.guestHeight,
-                            state.flowWidth,
-                            state.flowHeight
-                        )
-
-                        state.ready && state.flowWidth > 0 -> stringResource(
-                            R.string.framegen_runtime_active_manual,
-                            state.width,
-                            state.height,
                             state.flowWidth,
                             state.flowHeight
                         )
@@ -350,6 +288,45 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
                         }
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PresetRow(
+    selected: FrameGenPreset,
+    enabled: Boolean,
+    onSelected: (FrameGenPreset) -> Unit
+) {
+    val presets = FrameGenPreset.entries
+    val index = presets.indexOf(selected).coerceAtLeast(0)
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SettingSlider(
+            label = stringResource(R.string.framegen_label_preset),
+            value = index.toFloat(),
+            valueRange = 0f..(presets.size - 1).toFloat(),
+            steps = presets.size - 2,
+            valueText = stringResource(selected.labelRes),
+            enabled = enabled,
+            onValueChange = { onSelected(FrameGenPreset.atIndex(it.roundToInt())) }
+        )
+
+        Row(modifier = Modifier.fillMaxWidth()) {
+            presets.forEachIndexed { position, preset ->
+                Text(
+                    text = stringResource(preset.shortLabelRes),
+                    color = if (position == index) Rpcs.Accent else Rpcs.TextSecondary,
+                    fontSize = Dimens.CaptionSize,
+                    fontWeight = if (position == index) FontWeight.SemiBold else FontWeight.Normal,
+                    textAlign = when (position) {
+                        0 -> TextAlign.Start
+                        presets.size - 1 -> TextAlign.End
+                        else -> TextAlign.Center
+                    },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
