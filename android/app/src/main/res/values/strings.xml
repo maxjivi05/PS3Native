@@ -335,7 +335,6 @@
     <string name="drivers_install_already_installed">Selected driver is already installed</string>
 
     <string name="patches_title">Patches · %1$s</string>
-    <string name="patches_group_ungrouped">Ungrouped</string>
     <string name="patches_tab_available">Available</string>
     <string name="patches_tab_files">Patch files</string>
     <string name="patches_section_this_game">This game</string>
@@ -358,8 +357,6 @@
     <string name="patches_import_failed_message">Added %1$d. These were not valid patch files:\n%2$s</string>
     <string name="patches_detail_author">by %1$s</string>
     <string name="patches_detail_app_version">app %1$s</string>
-    <string name="patches_empty_title">No patches for this title</string>
-    <string name="patches_empty_message">Place patch .yml files in the patches folder and they will appear here.</string>
     <string name="patches_state_on">Enabled</string>
     <string name="patches_all_title">Patches</string>
     <string name="patches_all_tab">All patches</string>
