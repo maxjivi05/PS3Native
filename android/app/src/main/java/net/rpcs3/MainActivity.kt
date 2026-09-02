@@ -15,8 +15,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsControllerCompat
@@ -54,6 +56,18 @@ private fun StartupScreen() {
     }
 }
 
+@Composable
+private fun KeepScreenOn(active: Boolean) {
+    val view = LocalView.current
+
+    DisposableEffect(active) {
+        view.keepScreenOn = active
+        onDispose {
+            view.keepScreenOn = false
+        }
+    }
+}
+
 class MainActivity : ComponentActivity() {
     private var unregisterUsbEventListener: (() -> Unit)? = null
 
@@ -67,6 +81,9 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
+            val firmwareInstalling = FirmwareRepository.progressChannel.value != null
+            KeepScreenOn(active = firmwareInstalling)
+
             RPCS3Theme {
                 if (RPCS3.initialized.value) {
                     AppNavHost()
