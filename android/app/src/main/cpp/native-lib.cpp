@@ -767,10 +767,15 @@ class MainThreadProcessor {
   std::condition_variable cv;
   std::deque<std::pair<std::function<void(JNIEnv *)>, atomic_t<u32> *>> queue;
   std::atomic<std::thread::id> workerId{};
+  JNIEnv *workerEnv = nullptr;
 
 public:
   bool onWorkerThread() const {
     return workerId.load() == std::this_thread::get_id();
+  }
+
+  JNIEnv *getWorkerEnv() const {
+    return workerEnv;
   }
 
   void push(std::function<void(JNIEnv *)> cb, atomic_t<u32> *wakeUp = nullptr) {
@@ -785,6 +790,7 @@ public:
 
   void process(JNIEnv *env) {
     workerId.store(std::this_thread::get_id());
+    workerEnv = env;
 
     while (true) {
       std::function<void(JNIEnv *)> cb;
@@ -818,6 +824,11 @@ static void invokeAsync(std::function<void(JNIEnv *)> cb) {
 }
 
 static void invokeSync(std::function<void(JNIEnv *)> cb) {
+  if (g_mainThreadProcessor.onWorkerThread()) {
+    cb(g_mainThreadProcessor.getWorkerEnv());
+    return;
+  }
+
   atomic_t<u32> wakeup{false};
   g_mainThreadProcessor.push(std::move(cb), &wakeup);
 
