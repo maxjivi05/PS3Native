@@ -1307,8 +1307,9 @@ private:
 } static g_compilationQueue;
 
 struct NullVideoSource : video_source {
-  void set_video_path(const std::string &) override {}
-  void set_audio_path(const std::string &) override {}
+  void set_iso_path(const std::string &) override {}
+  void set_video_path(const std::string &, bool) override {}
+  void set_audio_path(const std::string &, bool) override {}
   void set_active(bool) override {}
   bool get_active() const override { return false; }
   bool has_new() const override { return false; }
@@ -1563,9 +1564,9 @@ static void setupCallbacks() {
                 "/system/fonts/", "/product/fonts/", "/system_ext/fonts/"};
           },
       .on_install_pkgs =
-          [](const std::vector<std::string> &pkgs) {
+          [](const std::vector<std::string> &pkgs, bool from_optical_drive) {
             for (const std::string &pkg : pkgs) {
-              if (!rpcs3::utils::install_pkg(pkg)) {
+              if (!rpcs3::utils::install_pkg(pkg, from_optical_drive)) {
                 rpcs3_android.error("cd install pkgs: failed to install %s",
                                     pkg);
                 return false;
@@ -2266,7 +2267,7 @@ static bool installPkgs(JNIEnv *env,
 
   package_install_result result = {};
   named_thread worker("PKG Installer", [&readers, &result, &bootable_paths] {
-    result = package_reader::extract_data(readers, bootable_paths);
+    result = package_reader::extract_data(readers, bootable_paths, false);
     return result.error == package_install_result::error_type::no_error;
   });
 
