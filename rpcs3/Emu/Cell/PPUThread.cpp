@@ -25,6 +25,7 @@
 #include "lv2/sys_sync.h"
 #include "lv2/sys_prx.h"
 #include "lv2/sys_overlay.h"
+#include "Emu/RSX/Overlays/overlay_message.h"
 #include "lv2/sys_process.h"
 #include "lv2/sys_spu.h"
 
@@ -3826,6 +3827,35 @@ struct jit_core_allocator
 	// Initialize global semaphore with the max number of threads
 	::semaphore<0x7fff> sem{std::max<s16>(thread_count, 1)};
 
+#ifdef __ANDROID__
+	atomic_t<u32> low_memory_claim{0};
+
+	static bool memory_is_tight()
+	{
+		const u64 avail = utils::get_avail_memory();
+		return avail != 0 && avail < (2048ull * 1024 * 1024);
+	}
+
+	static bool memory_is_critical()
+	{
+		const u64 avail = utils::get_avail_memory();
+		return avail != 0 && avail < (1024ull * 1024 * 1024);
+	}
+
+	static void wait_for_memory()
+	{
+		for (u32 waited_ms = 0; waited_ms < 10'000 && memory_is_critical(); waited_ms += 100)
+		{
+			if (Emu.IsStopped())
+			{
+				return;
+			}
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		}
+	}
+#endif
+
 	static s16 limit()
 	{
 		const s32 by_cores = std::min<s32>(0x7fff, utils::get_thread_count());
@@ -5073,7 +5103,26 @@ bool ppu_initialize(const ppu_module<lv2_obj>& info, bool check_only, u64 file_s
 	// each additional split of JIT instance results in a downgraded version of around (100% / N-1th) - (100% / Nth) percent of instructions
 	// where N is the total amount of JIT instances
 	// Subject to change
+#ifdef __ANDROID__
+	const u32 c_modules_per_jit = []() -> u32
+	{
+		constexpr u64 c_resolver_bytes_per_func = 5120;
+		constexpr u64 c_funcs_per_module = 4000;
+		constexpr u64 c_full_group_cost = 100 * c_funcs_per_module * c_resolver_bytes_per_func;
+
+		const u64 avail_mem = utils::get_avail_memory();
+
+		if (!avail_mem)
+		{
+			return 25;
+		}
+
+		const u64 budget = std::min<u64>(avail_mem / 4, c_full_group_cost);
+		return static_cast<u32>(std::clamp<u64>(budget / c_resolver_bytes_per_func / c_funcs_per_module, 8, 100));
+	}();
+#else
 	constexpr u32 c_modules_per_jit = 100;
+#endif
 
 	std::shared_ptr<std::pair<u32, u32>> local_jit_bounds = std::make_shared<std::pair<u32, u32>>(u32{umax}, 0);
 
@@ -5706,6 +5755,44 @@ bool ppu_initialize(const ppu_module<lv2_obj>& info, bool check_only, u64 file_s
 					ppu_log.warning("LLVM: Compiling module %s%s", cache_path, obj_name);
 
 					{
+#ifdef __ANDROID__
+						struct claim_guard_t
+						{
+							atomic_t<u32>* owner = nullptr;
+
+							~claim_guard_t()
+							{
+								if (owner)
+								{
+									owner->release(0);
+									owner->notify_one();
+								}
+							}
+						} serialise_compiles;
+
+						if (jit_core_allocator::memory_is_tight())
+						{
+							auto& claim = g_fxo->get<jit_core_allocator>().low_memory_claim;
+
+							for (u32 attempt = 0; attempt < 600; attempt++)
+							{
+								if (claim.compare_and_swap_test(0, 1))
+								{
+									serialise_compiles.owner = &claim;
+									break;
+								}
+
+								if (Emu.IsStopped())
+								{
+									break;
+								}
+
+								claim.wait(1, atomic_wait_timeout{100'000'000});
+							}
+
+							jit_core_allocator::wait_for_memory();
+						}
+#endif
 						// Use another JIT instance
 						jit_compiler jit2({}, g_cfg.core.llvm_cpu.to_string(), 0x1);
 						ppu_initialize2(jit2, part, cache_path, obj_name);
@@ -5833,6 +5920,20 @@ bool ppu_initialize(const ppu_module<lv2_obj>& info, bool check_only, u64 file_s
 				ppu_log.success("LLVM: Loaded module #%u %s", mod_index, obj_name);
 			}
 		}
+	}
+
+	if (failed_to_load && is_being_used_in_emulation)
+	{
+		u64 free_bytes = 0;
+
+		if (fs::device_stat stat{}; fs::statfs(cache_path, stat))
+		{
+			free_bytes = stat.avail_free;
+		}
+
+		ppu_log.fatal("LLVM: Compiled PPU code could not be loaded, the game will run interpreted (%u MB free in the cache)", free_bytes >> 20);
+
+		rsx::overlays::queue_message(fmt::format("Compiled PPU code could not be loaded and the game will run interpreted (%u MB free).\nFree up storage and restart the game to compile it again.", free_bytes >> 20), 30'000'000);
 	}
 
 	if (failed_to_load || !is_being_used_in_emulation || (cpu ? cpu->state.all_of(cpu_flag::exit) : Emu.IsStopped()))
