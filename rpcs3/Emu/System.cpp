@@ -1837,6 +1837,9 @@ game_boot_result Emulator::Load(const std::string& title_id, bool is_disc_patch,
 			}
 #endif
 			sys_log.notice("Used configuration:\n%s\n", g_cfg.to_string());
+#ifdef LLVM_AVAILABLE
+			sys_log.notice("LLVM CPU: %s", jit_compiler::cpu(g_cfg.core.llvm_cpu.to_string()));
+#endif
 
 			// Initialize patch engine
 			g_fxo->need<patch_engine>();

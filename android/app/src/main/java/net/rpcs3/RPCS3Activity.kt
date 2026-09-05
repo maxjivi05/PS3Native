@@ -1,5 +1,6 @@
 package net.rpcs3
 
+import net.rpcs3.utils.CpuSupport
 import androidx.activity.ComponentActivity
 import android.hardware.display.DisplayManager
 import android.os.Handler
@@ -67,6 +68,10 @@ class RPCS3Activity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (CpuSupport.missingFeatures != null) {
+            finish()
+            return
+        }
         binding = ActivityRpcs3Binding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -543,6 +548,9 @@ class RPCS3Activity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        if (CpuSupport.missingFeatures != null) {
+            return
+        }
         stopHud()
         stopOverlay()
         stopFrameGenDisplay()

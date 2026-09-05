@@ -1,5 +1,6 @@
 package net.rpcs3
 
+import net.rpcs3.utils.CpuSupport
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -208,6 +209,11 @@ class PrecompilerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (CpuSupport.missingFeatures != null) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+
         val batch = intent?.getParcelableArrayListExtra<Uri>("batch")
         val uri = intent?.getParcelableExtra<Uri>("uri")
         val action = intent?.getIntExtra("action", 0) ?: 0

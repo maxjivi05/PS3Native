@@ -29,6 +29,7 @@
     <string name="version_prefix">v%1$s</string>
 
     <string name="startup_message">Starting RPCS3</string>
+    <string name="unsupported_cpu">This build needs an ARMv8.2 CPU. This device is missing %1$s, so PS3Native cannot run on it.</string>
     <string name="notification_channel_progress">Installation progress</string>
 
     <string name="progress_firmware_installation">Firmware Installation</string>

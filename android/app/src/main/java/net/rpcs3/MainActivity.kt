@@ -1,5 +1,6 @@
 package net.rpcs3
 
+import net.rpcs3.utils.CpuSupport
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -57,6 +58,22 @@ private fun StartupScreen() {
 }
 
 @Composable
+private fun UnsupportedCpuScreen(message: String) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
+    }
+}
+
+@Composable
 private fun KeepScreenOn(active: Boolean) {
     val view = LocalView.current
 
@@ -78,6 +95,15 @@ class MainActivity : ComponentActivity() {
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+
+        CpuSupport.missingFeatures?.let { missing ->
+            setContent {
+                RPCS3Theme {
+                    UnsupportedCpuScreen(getString(R.string.unsupported_cpu, missing))
+                }
+            }
+            return
         }
 
         setContent {

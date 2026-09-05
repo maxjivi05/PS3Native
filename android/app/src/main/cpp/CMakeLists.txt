@@ -4,6 +4,13 @@ project("rpcs3-android")
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_POSITION_INDEPENDENT_CODE on)
 
+if(ANDROID_ABI STREQUAL "arm64-v8a")
+    add_compile_options(-march=armv8.2-a+dotprod+fp16)
+endif()
+
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -g -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -DNDEBUG")
+
 get_filename_component(RPCS3_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../.." ABSOLUTE)
 get_filename_component(RPCS3_ANDROID_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../.." ABSOLUTE)
 

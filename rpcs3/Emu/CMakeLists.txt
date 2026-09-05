@@ -753,3 +753,7 @@ endif()
 if(WAYLAND_FOUND)
     target_link_libraries(rpcs3_emu PRIVATE OpenGL::EGL)
 endif()
+
+if(ANDROID)
+    target_compile_options(rpcs3_emu PRIVATE -fno-stack-protector)
+endif()
