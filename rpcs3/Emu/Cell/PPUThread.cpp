@@ -3389,7 +3389,7 @@ static void ppu_trace(u64 addr)
 template <typename T>
 static T ppu_load_acquire_reservation(ppu_thread& ppu, u32 addr)
 {
-	perf_meter<"LARX"_u32> perf0;
+	perf_meter<"LARX"_u32> perf0(nullptr);
 
 	// Do not allow stores accessed from the same cache line to past reservation load
 	atomic_fence_seq_cst();
@@ -3465,12 +3465,14 @@ static T ppu_load_acquire_reservation(ppu_thread& ppu, u32 addr)
 		ppu.use_full_rdata = false;
 	}
 
+	const u64 larx_tsc = (addr & addr_mask) == (ppu.last_faddr & addr_mask) ? utils::get_tsc() : 0;
+
 	if (ppu_log.trace && (addr & addr_mask) == (ppu.last_faddr & addr_mask))
 	{
-		ppu_log.trace(u8"LARX after fail: addr=0x%x, faddr=0x%x, time=%u c", addr, ppu.last_faddr, (perf0.get() - ppu.last_ftsc));
+		ppu_log.trace(u8"LARX after fail: addr=0x%x, faddr=0x%x, time=%u c", addr, ppu.last_faddr, (larx_tsc - ppu.last_ftsc));
 	}
 
-	if ((addr & addr_mask) == (ppu.last_faddr & addr_mask) && (perf0.get() - ppu.last_ftsc) < 600 && (vm::reservation_acquire(addr) & -128) == ppu.last_ftime)
+	if ((addr & addr_mask) == (ppu.last_faddr & addr_mask) && (larx_tsc - ppu.last_ftsc) < 600 && (vm::reservation_acquire(addr) & -128) == ppu.last_ftime)
 	{
 		be_t<u64> rdata;
 		std::memcpy(&rdata, &ppu.rdata[addr & 0x78], 8);
@@ -3538,7 +3540,7 @@ extern u64 ppu_ldarx(ppu_thread& ppu, u32 addr)
 template <typename T>
 static bool ppu_store_reservation(ppu_thread& ppu, u32 addr, u64 reg_value)
 {
-	perf_meter<"STCX"_u32> perf0;
+	perf_meter<"STCX"_u32> perf0(nullptr);
 
 	if (addr % sizeof(T))
 	{

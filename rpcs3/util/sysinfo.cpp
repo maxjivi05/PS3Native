@@ -428,6 +428,20 @@ bool utils::has_dotprod()
 	return g_value;
 }
 
+bool utils::has_wfe_event_stream()
+{
+	static const bool g_value = []() -> bool
+	{
+#if defined(__linux__)
+		return (getauxval(AT_HWCAP) & HWCAP_EVTSTRM) != 0;
+#else
+		return true;
+#endif
+	}();
+
+	return g_value;
+}
+
 bool utils::has_i8mm()
 {
 	static const bool g_value = []() -> bool
@@ -577,6 +591,10 @@ std::string utils::get_system_info()
 	{
 		result += " | Neon";
 	}
+
+#if defined(__linux__)
+	fmt::append(result, " | EVTSTRM-%s", has_wfe_event_stream() ? "on" : "off");
+#endif
 #else
 
 	if (has_avx())

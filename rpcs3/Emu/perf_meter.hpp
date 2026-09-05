@@ -100,6 +100,18 @@ public:
 		std::fill(std::begin(m_timestamps), std::end(m_timestamps), 0);
 	}
 
+	FORCE_INLINE SAFE_BUFFERS() perf_meter(std::nullptr_t) noexcept
+	{
+		if (g_cfg.core.perf_report) [[unlikely]]
+		{
+			restart();
+		}
+		else
+		{
+			std::fill(std::begin(m_timestamps), std::end(m_timestamps), 0);
+		}
+	}
+
 	FORCE_INLINE SAFE_BUFFERS(operator bool) () const noexcept
 	{
 		return m_timestamps[0] != 0;

@@ -10,6 +10,7 @@
 #include "NV47/HW/context.h"
 
 #include "util/asm.hpp"
+#include "util/sysinfo.hpp"
 
 #include <thread>
 
@@ -666,7 +667,19 @@ namespace rsx
 				{
 					performance_counters.FIFO_idle_timestamp = get_system_time();
 					performance_counters.state = FIFO::state::empty;
+					m_fifo_idle_spins = 0;
 				}
+#if defined(ARCH_ARM64)
+				else if (m_fifo_idle_spins < 8)
+				{
+					m_fifo_idle_spins++;
+					utils::pause();
+				}
+				else if (utils::has_wfe_event_stream())
+				{
+					utils::spin_on_cacheline_once(ctrl->put, ctrl->put.load(), 100);
+				}
+#endif
 				else
 				{
 					std::this_thread::yield();

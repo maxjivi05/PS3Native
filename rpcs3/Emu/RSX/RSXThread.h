@@ -106,6 +106,7 @@ namespace rsx
 		u64 timestamp_ctrl = 0;
 		u64 timestamp_subvalue = 0;
 		u64 m_cycles_counter = 0;
+		u32 m_fifo_idle_spins = 0;
 
 		display_flip_info_t m_queued_flip{};
 
