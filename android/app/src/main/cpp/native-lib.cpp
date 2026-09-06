@@ -97,6 +97,7 @@ struct AtExit {
 
 static bool g_initialized;
 static std::atomic<ANativeWindow *> g_native_window;
+static std::atomic<int> g_surface_hosts{0};
 static std::atomic<float> g_hud_fps{0.f};
 static std::atomic<float> g_hud_frametime{0.f};
 static std::atomic<float> g_hud_last_frame_ms{0.f};
@@ -173,7 +174,8 @@ struct GraphicsFrame : GSFrameBase {
   ANativeWindow *getNativeWindow() const {
     ANativeWindow *result;
     while ((result = g_native_window.load()) == nullptr) [[unlikely]] {
-      if (Emu.IsStopped()) {
+      if (g_surface_hosts.load() == 0 ||
+          (Emu.IsStopped() && stx::g_launch_retainer == 0)) {
         return activeNativeWindow;
       }
 
@@ -1973,6 +1975,13 @@ extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcs3_RPCS3_frameGenForget(
   vk::set_frame_generation_shader_cache({});
   vk::set_frame_generation_status({});
   return fs::remove_file(cachePath) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL Java_net_rpcs3_RPCS3_surfaceHostAlive(
+    JNIEnv *, jobject, jboolean alive) {
+  const int hosts = alive ? g_surface_hosts.fetch_add(1) + 1
+                          : g_surface_hosts.fetch_sub(1) - 1;
+  rpcs3_android.warning("surface host %s, %d alive", alive ? "created" : "destroyed", hosts);
 }
 
 extern "C" JNIEXPORT jboolean JNICALL Java_net_rpcs3_RPCS3_surfaceEvent(
