@@ -213,6 +213,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
+        if (CpuSupport.missingFeatures != null) {
+            return
+        }
         RPCS3.instance.settingsFlush()
     }
 
