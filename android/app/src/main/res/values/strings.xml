@@ -223,6 +223,14 @@
     <string name="drivers_flags_add">Add flag</string>
     <string name="drivers_flags_delete">Remove flag</string>
     <string name="drivers_flags_restore">Restore defaults</string>
+    <string name="drivers_add_repository">Add repository</string>
+    <string name="drivers_edit_repository">Edit repository</string>
+    <string name="drivers_remove_repository">Remove repository</string>
+    <string name="drivers_restore_defaults">Restore defaults</string>
+    <string name="drivers_no_packages">No driver packages published in this repository.</string>
+    <string name="drivers_download_install">Download and install</string>
+    <string name="drivers_repo_name">Name</string>
+    <string name="drivers_repo_url">GitHub releases URL</string>
     <string name="settings_save">Save</string>
     <string name="settings_reset">Reset</string>
     <string name="settings_cancel">Cancel</string>
@@ -373,6 +381,7 @@
     <string name="patches_import_failed_message">Added %1$d. These were not valid patch files:\n%2$s</string>
     <string name="patches_detail_author">by %1$s</string>
     <string name="patches_detail_app_version">app %1$s</string>
+    <string name="patches_file_detail">%1$s · %2$s</string>
     <string name="patches_state_on">Enabled</string>
     <string name="patches_all_title">Patches</string>
     <string name="patches_all_tab">All patches</string>

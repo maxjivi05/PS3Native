@@ -58,6 +58,7 @@ import kotlinx.coroutines.withContext
 import net.rpcs3.R
 import net.rpcs3.provider.AppDataDocumentProvider
 import net.rpcs3.ui.components.GhostButton
+import net.rpcs3.ui.components.LocalPaneCompact
 import net.rpcs3.ui.components.PaneNavRow
 import net.rpcs3.ui.components.PaneScaffold
 import net.rpcs3.ui.components.PaneSectionTitle
@@ -205,50 +206,66 @@ fun DebugScreen(
 
             Spacer(Modifier.height(Dims.RowSpacing))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            val shareLog: () -> Unit = {
+                val file = DocumentFile.fromSingleUri(
+                    context,
+                    DocumentsContract.buildDocumentUri(
+                        AppDataDocumentProvider.authorityOf(context),
+                        "${AppDataDocumentProvider.ROOT_ID}/cache/RPCS3.log"
+                    )
+                )
+
+                if (file != null && file.exists() && file.length() != 0L) {
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        setDataAndType(file.uri, "text/plain")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        putExtra(Intent.EXTRA_STREAM, file.uri)
+                    }
+                    context.startActivity(
+                        Intent.createChooser(
+                            intent,
+                            context.getString(R.string.debug_share_log_chooser)
+                        )
+                    )
+                } else {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.debug_log_not_found),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+
+            val shareRow: @Composable (Modifier) -> Unit = { rowModifier ->
                 PaneNavRow(
                     title = stringResource(R.string.debug_share_log),
                     description = stringResource(R.string.debug_share_log_description),
                     icon = Icons.Outlined.Share,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        val file = DocumentFile.fromSingleUri(
-                            context,
-                            DocumentsContract.buildDocumentUri(
-                                AppDataDocumentProvider.authorityOf(context),
-                                "${AppDataDocumentProvider.ROOT_ID}/cache/RPCS3.log"
-                            )
-                        )
-
-                        if (file != null && file.exists() && file.length() != 0L) {
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                setDataAndType(file.uri, "text/plain")
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                putExtra(Intent.EXTRA_STREAM, file.uri)
-                            }
-                            context.startActivity(
-                                Intent.createChooser(
-                                    intent,
-                                    context.getString(R.string.debug_share_log_chooser)
-                                )
-                            )
-                        } else {
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.debug_log_not_found),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
+                    modifier = rowModifier,
+                    onClick = shareLog
                 )
-                Spacer(Modifier.width(Dims.RowSpacing))
+            }
+
+            val diagnosticsRow: @Composable (Modifier) -> Unit = { rowModifier ->
                 PaneNavRow(
                     title = stringResource(R.string.debug_diagnostics),
                     description = stringResource(R.string.debug_diagnostics_description),
                     icon = Icons.Outlined.Info,
-                    modifier = Modifier.weight(1f),
+                    modifier = rowModifier,
                     onClick = navigateToDiagnostics
                 )
+            }
+
+            if (LocalPaneCompact.current) {
+                shareRow(Modifier.fillMaxWidth())
+                Spacer(Modifier.height(Dims.RowSpacing))
+                diagnosticsRow(Modifier.fillMaxWidth())
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    shareRow(Modifier.weight(1f))
+                    Spacer(Modifier.width(Dims.RowSpacing))
+                    diagnosticsRow(Modifier.weight(1f))
+                }
             }
         }
     }

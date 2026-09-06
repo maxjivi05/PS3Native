@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,6 +36,7 @@ import net.rpcs3.framegen.FrameGenImportResult
 import net.rpcs3.framegen.FrameGenPrefs
 import net.rpcs3.framegen.FrameGenPreset
 import net.rpcs3.ui.components.GhostButton
+import net.rpcs3.ui.components.LocalPaneCompact
 import net.rpcs3.ui.components.SettingChip
 import net.rpcs3.ui.components.SettingGroup
 import net.rpcs3.ui.components.SettingSlider
@@ -56,6 +58,7 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
     val prefs = remember { FrameGenPrefs.of(context) }
     val scope = rememberCoroutineScope()
     val state by FrameGen.state
+    val compact = LocalPaneCompact.current
 
     var enabled by remember { mutableStateOf(FrameGenPrefs.isEnabled(prefs)) }
     var multiplier by remember { mutableIntStateOf(FrameGenPrefs.multiplier(prefs)) }
@@ -143,34 +146,35 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
 
                 ThinDivider()
 
-                LabelledChipRow(label = stringResource(R.string.framegen_label_target)) {
+                val targets = remember { listOf(0) + TargetRates }
+                LabelledChipGrid(
+                    label = stringResource(R.string.framegen_label_target),
+                    count = targets.size,
+                    perRow = if (compact) 2 else targets.size
+                ) { index ->
+                    val candidate = targets[index]
                     SettingChip(
-                        label = stringResource(R.string.framegen_target_off),
-                        detail = stringResource(R.string.framegen_target_off_detail),
-                        selected = targetRate == 0,
+                        label = if (candidate == 0) {
+                            stringResource(R.string.framegen_target_off)
+                        } else {
+                            stringResource(R.string.framegen_target_value, candidate)
+                        },
+                        detail = stringResource(
+                            if (candidate == 0) {
+                                R.string.framegen_target_off_detail
+                            } else {
+                                R.string.framegen_target_detail
+                            }
+                        ),
+                        selected = candidate == targetRate,
                         enabled = state.imported,
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            targetRate = 0
-                            FrameGenPrefs.setTargetRate(prefs, 0)
+                            targetRate = candidate
+                            FrameGenPrefs.setTargetRate(prefs, candidate)
                             FrameGen.push(context)
                         }
                     )
-
-                    TargetRates.forEach { candidate ->
-                        SettingChip(
-                            label = stringResource(R.string.framegen_target_value, candidate),
-                            detail = stringResource(R.string.framegen_target_detail),
-                            selected = candidate == targetRate,
-                            enabled = state.imported,
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                targetRate = candidate
-                                FrameGenPrefs.setTargetRate(prefs, candidate)
-                                FrameGen.push(context)
-                            }
-                        )
-                    }
                 }
 
                 ThinDivider()
@@ -346,5 +350,31 @@ private fun LabelledChipRow(label: String, content: @Composable () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Dimens.TightGap)
         ) { content() }
+    }
+}
+
+@Composable
+private fun LabelledChipGrid(
+    label: String,
+    count: Int,
+    perRow: Int,
+    chip: @Composable RowScope.(Int) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            color = Rpcs.TextSecondary,
+            fontSize = Dimens.LabelSize,
+            fontWeight = FontWeight.Medium
+        )
+        (0 until count).chunked(perRow).forEach { indices ->
+            Spacer(Modifier.height(Dimens.TightGap))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.TightGap)
+            ) {
+                indices.forEach { chip(it) }
+            }
+        }
     }
 }

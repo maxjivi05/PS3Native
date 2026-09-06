@@ -1,5 +1,7 @@
 package net.rpcs3.ui.games
 
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.safeDrawing
 import net.rpcs3.ui.theme.Dims
 import net.rpcs3.ui.theme.Rpcs
 
@@ -259,10 +261,10 @@ fun GameDetailDialog(
                     )
             )
 
-            Box(
+            BoxWithConstraints(
                 Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.systemBars)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
             ) {
                 Box(
                     modifier = Modifier
@@ -296,15 +298,10 @@ fun GameDetailDialog(
                 val actionSlots = 4
                 val actionWidth =
                     actionIconSize * actionSlots + actionIconSpacing * (actionSlots - 1)
+                val compact = maxWidth < Dims.CompactWidth
 
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .padding(start = 22.dp, end = 22.dp, bottom = 48.dp),
-                    verticalAlignment = Alignment.Bottom
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                val heading: @Composable (Modifier) -> Unit = { headingModifier ->
+                    Column(modifier = headingModifier) {
                         Text(
                             text = title,
                             color = LaunchTextPrimary,
@@ -335,11 +332,45 @@ fun GameDetailDialog(
                             )
                         }
                     }
+                }
 
-                    Spacer(Modifier.width(18.dp))
+                val settingsLabel = stringResource(R.string.detail_settings)
+                val updateLabel = stringResource(R.string.detail_update)
+                val patchesLabel = stringResource(R.string.detail_patches)
+                val actions = buildList {
+                    add(
+                        ActionSpec(
+                            Icons.Outlined.Settings,
+                            settingsLabel,
+                            false,
+                            onSettings
+                        )
+                    )
+                    onInstallUpdate?.let {
+                        add(
+                            ActionSpec(
+                                Icons.Outlined.SystemUpdateAlt,
+                                updateLabel,
+                                false,
+                                it
+                            )
+                        )
+                    }
+                    onPatches?.let {
+                        add(ActionSpec(Icons.Outlined.Healing, patchesLabel, false, it))
+                    }
+                    if (onUninstall != null) {
+                        add(
+                            ActionSpec(Icons.Outlined.Delete, uninstallLabel, true) {
+                                confirmUninstall = true
+                            }
+                        )
+                    }
+                }
 
+                val controls: @Composable (Modifier) -> Unit = { controlsModifier ->
                     Column(
-                        modifier = Modifier.width(actionWidth),
+                        modifier = controlsModifier,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -347,43 +378,14 @@ fun GameDetailDialog(
                             modifier = Modifier.fillMaxWidth(),
                             onClick = onPlay
                         )
-                        val settingsLabel = stringResource(R.string.detail_settings)
-                        val updateLabel = stringResource(R.string.detail_update)
-                        val patchesLabel = stringResource(R.string.detail_patches)
-                        val actions = buildList {
-                            add(
-                                ActionSpec(
-                                    Icons.Outlined.Settings,
-                                    settingsLabel,
-                                    false,
-                                    onSettings
-                                )
-                            )
-                            onInstallUpdate?.let {
-                                add(
-                                    ActionSpec(
-                                        Icons.Outlined.SystemUpdateAlt,
-                                        updateLabel,
-                                        false,
-                                        it
-                                    )
-                                )
-                            }
-                            onPatches?.let {
-                                add(ActionSpec(Icons.Outlined.Healing, patchesLabel, false, it))
-                            }
-                            if (onUninstall != null) {
-                                add(
-                                    ActionSpec(Icons.Outlined.Delete, uninstallLabel, true) {
-                                        confirmUninstall = true
-                                    }
-                                )
-                            }
-                        }
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(actionIconSpacing),
+                            horizontalArrangement = if (compact) {
+                                Arrangement.spacedBy(actionIconSpacing, Alignment.CenterHorizontally)
+                            } else {
+                                Arrangement.spacedBy(actionIconSpacing)
+                            },
                             verticalAlignment = Alignment.Top
                         ) {
                             actions.forEach { spec ->
@@ -410,6 +412,31 @@ fun GameDetailDialog(
                                 }
                             }
                         }
+                    }
+                }
+
+                if (compact) {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .padding(start = 22.dp, end = 22.dp, bottom = 40.dp)
+                    ) {
+                        heading(Modifier.fillMaxWidth())
+                        Spacer(Modifier.height(18.dp))
+                        controls(Modifier.fillMaxWidth())
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .padding(start = 22.dp, end = 22.dp, bottom = 48.dp),
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        heading(Modifier.weight(1f))
+                        Spacer(Modifier.width(18.dp))
+                        controls(Modifier.width(actionWidth))
                     }
                 }
             }

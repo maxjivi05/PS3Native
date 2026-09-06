@@ -37,11 +37,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import net.rpcs3.R
 import net.rpcs3.ui.theme.Rpcs
 import net.rpcs3.utils.DriverAsset
 import net.rpcs3.utils.DriverRelease
@@ -152,7 +154,7 @@ fun DriverDownloadTab(
                 )
             } else if (!state.loadingRepo.equals(repo.apiUrl) && releases.isEmpty()) {
                 Text(
-                    text = "No driver packages published in this repository.",
+                    text = stringResource(R.string.drivers_no_packages),
                     color = Rpcs.TextDim,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 6.dp)
@@ -188,13 +190,13 @@ fun DriverDownloadTab(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         SmallAction(
-            label = "Add repository",
+            label = stringResource(R.string.drivers_add_repository),
             icon = Icons.Outlined.Add,
             modifier = Modifier.weight(1f),
             onClick = { showAdd = true }
         )
         SmallAction(
-            label = "Restore defaults",
+            label = stringResource(R.string.drivers_restore_defaults),
             icon = Icons.Outlined.Restore,
             modifier = Modifier.weight(1f),
             onClick = onRestoreDefaults
@@ -247,8 +249,8 @@ private fun RepoRow(
             Spacer(Modifier.height(0.dp))
         }
 
-        IconAction(Icons.Outlined.Edit, "Edit repository", onEdit)
-        IconAction(Icons.Outlined.Delete, "Remove repository", onDelete)
+        IconAction(Icons.Outlined.Edit, stringResource(R.string.drivers_edit_repository), onEdit)
+        IconAction(Icons.Outlined.Delete, stringResource(R.string.drivers_remove_repository), onDelete)
 
         Icon(
             imageVector = if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
@@ -341,7 +343,7 @@ private fun AssetRow(asset: DriverAsset, busy: Boolean, onDownload: () -> Unit) 
         } else {
             Icon(
                 imageVector = Icons.Outlined.Download,
-                contentDescription = "Download and install",
+                contentDescription = stringResource(R.string.drivers_download_install),
                 tint = Rpcs.Accent,
                 modifier = Modifier.size(17.dp)
             )
@@ -415,14 +417,24 @@ private fun RepoDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (existing == null) "Add repository" else "Edit repository") },
+        title = {
+            Text(
+                stringResource(
+                    if (existing == null) {
+                        R.string.drivers_add_repository
+                    } else {
+                        R.string.drivers_edit_repository
+                    }
+                )
+            )
+        },
         text = {
             Column {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
                     singleLine = true,
-                    label = { Text("Name") },
+                    label = { Text(stringResource(R.string.drivers_repo_name)) },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(8.dp))
@@ -430,7 +442,7 @@ private fun RepoDialog(
                     value = url,
                     onValueChange = { url = it },
                     singleLine = true,
-                    label = { Text("GitHub releases URL") },
+                    label = { Text(stringResource(R.string.drivers_repo_url)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -441,17 +453,11 @@ private fun RepoDialog(
                 enabled = url.isNotBlank(),
                 onClick = { onConfirm(name, url) }
             ) {
-                Text(stringResourceOk())
+                Text(stringResource(android.R.string.ok))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResourceCancel()) }
+            TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
         }
     )
 }
-
-@Composable
-private fun stringResourceOk() = androidx.compose.ui.res.stringResource(android.R.string.ok)
-
-@Composable
-private fun stringResourceCancel() = androidx.compose.ui.res.stringResource(android.R.string.cancel)

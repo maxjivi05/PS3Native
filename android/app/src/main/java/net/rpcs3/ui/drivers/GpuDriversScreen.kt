@@ -260,7 +260,8 @@ fun GpuDriversScreen(navigateBack: () -> Unit) {
                                     (repo.apiUrl to outcome.getOrDefault(emptyList())),
                                 errors = if (outcome.isFailure) {
                                     downloadState.errors + (repo.apiUrl to
-                                        (outcome.exceptionOrNull()?.message ?: "Fetch failed"))
+                                        (outcome.exceptionOrNull()?.message
+                                            ?: context.getString(R.string.drivers_fetch_failed)))
                                 } else {
                                     downloadState.errors - repo.apiUrl
                                 }

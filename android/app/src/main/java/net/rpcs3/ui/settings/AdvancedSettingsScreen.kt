@@ -3,9 +3,13 @@ package net.rpcs3.ui.settings
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -66,6 +70,7 @@ fun AdvancedSettingsScreen(
         modifier = Modifier
             .nestedScroll(topBarScrollBehavior.nestedScrollConnection)
             .then(modifier),
+        contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
             val titlePath = path.replace("@@", " / ")
             LargeTopAppBar(
@@ -112,6 +117,9 @@ fun AdvancedSettingsScreen(
                     }
                 },
                 scrollBehavior = topBarScrollBehavior,
+                windowInsets = WindowInsets.safeDrawing.only(
+                    WindowInsetsSides.Horizontal + WindowInsetsSides.Top
+                ),
                 navigationIcon = {
                     IconButton(onClick = navigateBack) {
                         Icon(

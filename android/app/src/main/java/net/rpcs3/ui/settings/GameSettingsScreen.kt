@@ -12,7 +12,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -21,11 +23,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -50,6 +55,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -75,6 +81,7 @@ import net.rpcs3.R
 import net.rpcs3.RPCS3
 import net.rpcs3.dialogs.AlertDialogQueue
 import net.rpcs3.ui.components.GhostButton
+import net.rpcs3.ui.components.LocalPaneCompact
 import net.rpcs3.ui.components.SectionLabel
 import net.rpcs3.ui.components.SettingGroup
 import net.rpcs3.ui.framegen.FrameGenCategory
@@ -184,268 +191,395 @@ fun GameSettingsScreen(
 
     val tree = root
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(SettingsStyle.BgDeep)
-            .windowInsetsPadding(WindowInsets.systemBars)
+            .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
         if (tree == null) {
             CircularProgressIndicator(
                 modifier = Modifier.align(Alignment.Center),
                 color = SettingsStyle.AccentBlue
             )
-            return@Box
+            return@BoxWithConstraints
         }
 
+        val compact = maxWidth < Dims.CompactWidth
         val categories = remember(tree) {
             listOf(SettingsCategory(DriverCategory, listOf(DriverCategory), null)) +
                 categoriesOf(tree) +
                 SettingsCategory(ControlsCategory, listOf(ControlsCategory), null)
         }
-        val currentName = categories.getOrNull(selected)?.label
+        val controlsLabel = stringResource(R.string.settings_category_controls)
+        val driverLabel = stringResource(R.string.settings_category_gpu_driver)
+        fun labelOf(entry: SettingsCategory): String = when (entry.label) {
+            ControlsCategory -> controlsLabel
+            DriverCategory -> driverLabel
+            else -> entry.label
+        }
 
-        Row(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .width(SettingsStyle.SidebarWidth)
-                    .fillMaxHeight()
-                    .background(SettingsStyle.SidebarBg)
-                    .padding(top = 14.dp, bottom = 12.dp)
-            ) {
-                if (titleId.isEmpty()) {
-                    Text(
-                        text = title,
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
-                        color = SettingsStyle.TextPrimary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.2.sp,
-                        lineHeight = 15.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                } else {
-                    ConfigSourceSelector(
-                        titleId = titleId,
-                        source = configSource,
-                        entry = recommended,
-                        modifier = Modifier.padding(
-                            start = 12.dp,
-                            end = 12.dp,
-                            bottom = 10.dp
-                        ),
-                        onSelect = { next ->
-                            scope.launch(Dispatchers.IO) {
-                                RecommendedConfigs.setSource(context, titleId, next)
-                                withContext(Dispatchers.Main) { reloadToken++ }
-                            }
-                        }
-                    )
-                }
-                Box(
-                    Modifier
-                        .padding(horizontal = 12.dp)
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(SettingsStyle.Divider)
-                )
-                Spacer(Modifier.height(8.dp))
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(1.dp)
-                ) {
-                    categories.forEachIndexed { index, entry ->
-                        SidebarItem(
-                            icon = iconForCategory(entry.label),
-                            label = when (entry.label) {
-                                ControlsCategory -> stringResource(R.string.settings_category_controls)
-                                DriverCategory -> stringResource(R.string.settings_category_gpu_driver)
-                                else -> entry.label
-                            },
-                            isSelected = index == selected,
-                            nested = entry.parent != null,
-                            onClick = { selected = index }
-                        )
-                    }
-                }
-
-                if (onClose != null) {
-                    Box(
-                        Modifier
-                            .padding(horizontal = 12.dp)
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(SettingsStyle.Divider)
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        GhostButton(
-                            label = stringResource(R.string.settings_save),
-                            accent = true,
-                            tint = Rpcs.Success,
-                            horizontalPadding = 6.dp,
-                            onClick = {
-                                scope.launch(Dispatchers.IO) {
-                                    RPCS3.instance.settingsFlush()
-                                    withContext(Dispatchers.Main) { onClose() }
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                        GhostButton(
-                            label = stringResource(R.string.settings_reset),
-                            accent = true,
-                            tint = Rpcs.Warning,
-                            horizontalPadding = 6.dp,
-                            onClick = {
-                                AlertDialogQueue.showDialog(
-                                    title = if (titleId.isEmpty()) {
-                                        context.getString(R.string.settings_reset_global_title)
-                                    } else {
-                                        context.getString(
-                                            R.string.settings_reset_game_title,
-                                            titleId
-                                        )
-                                    },
-                                    message = when {
-                                        titleId.isEmpty() -> {
-                                            context.getString(R.string.settings_reset_global_message)
-                                        }
-
-                                        configSource == ConfigSource.Recommended -> {
-                                            context.getString(
-                                                R.string.settings_reset_recommended_message,
-                                                titleId
-                                            )
-                                        }
-
-                                        else -> context.getString(
-                                            R.string.settings_reset_game_message,
-                                            titleId
-                                        )
-                                    },
-                                    confirmText = context.getString(R.string.action_reset),
-                                    dismissText = context.getString(R.string.action_cancel),
-                                    onConfirm = {
-                                        scope.launch(Dispatchers.IO) {
-                                            if (titleId.isEmpty()) {
-                                                resetToDefaults(tree, titleId)
-                                            } else {
-                                                RecommendedConfigs.applyCurrent(context, titleId)
-                                            }
-
-                                            withContext(Dispatchers.Main) { reloadToken++ }
-                                        }
-                                    }
-                                )
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                        GhostButton(
-                            label = stringResource(R.string.settings_cancel),
-                            accent = true,
-                            tint = Rpcs.Danger,
-                            horizontalPadding = 6.dp,
-                            onClick = {
-                                val snapshot = baseline
-                                scope.launch(Dispatchers.IO) {
-                                    if (snapshot != null) {
-                                        revertTo(snapshot, tree, titleId)
-                                    }
-                                    withContext(Dispatchers.Main) { onClose() }
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
+        val save: () -> Unit = {
+            scope.launch(Dispatchers.IO) {
+                RPCS3.instance.settingsFlush()
+                withContext(Dispatchers.Main) { onClose?.invoke() }
             }
+        }
 
-            Box(
-                Modifier
-                    .width(1.dp)
-                    .fillMaxHeight()
-                    .background(SettingsStyle.Divider)
-            )
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .background(SettingsStyle.ContentBg)
-                    .widthIn(max = Dims.ContentMaxWidth)
-            ) {
-                AnimatedContent(
-                    targetState = selected,
-                    transitionSpec = {
-                        val direction = if (targetState > initialState) 1 else -1
-                        (slideInHorizontally(tween(220)) { direction * it / 6 } + fadeIn(tween(200)))
-                            .togetherWith(
-                                slideOutHorizontally(tween(180)) { -direction * it / 6 } +
-                                    fadeOut(tween(120))
-                            )
-                    },
-                    label = "settingsSection"
-                ) { index ->
-                    val entry = categories.getOrNull(index)
-                    val name = entry?.label
-                    val node = entry?.let { e ->
-                        var cursor: JSONObject? = tree
-                        for (step in e.path) cursor = cursor?.optJSONObject(step)
-                        cursor
+        val reset: () -> Unit = {
+            AlertDialogQueue.showDialog(
+                title = if (titleId.isEmpty()) {
+                    context.getString(R.string.settings_reset_global_title)
+                } else {
+                    context.getString(R.string.settings_reset_game_title, titleId)
+                },
+                message = when {
+                    titleId.isEmpty() -> {
+                        context.getString(R.string.settings_reset_global_message)
                     }
 
-                    if (name == DriverCategory) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                                .padding(horizontal = 20.dp, vertical = 14.dp)
-                        ) {
-                            GameDriverSettings(titleId)
+                    configSource == ConfigSource.Recommended -> {
+                        context.getString(R.string.settings_reset_recommended_message, titleId)
+                    }
+
+                    else -> context.getString(R.string.settings_reset_game_message, titleId)
+                },
+                confirmText = context.getString(R.string.action_reset),
+                dismissText = context.getString(R.string.action_cancel),
+                onConfirm = {
+                    scope.launch(Dispatchers.IO) {
+                        if (titleId.isEmpty()) {
+                            resetToDefaults(tree, titleId)
+                        } else {
+                            RecommendedConfigs.applyCurrent(context, titleId)
                         }
-                    } else if (name == ControlsCategory) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                                .padding(horizontal = 20.dp, vertical = 14.dp)
-                        ) {
-                            ControlsSettings()
+
+                        withContext(Dispatchers.Main) { reloadToken++ }
+                    }
+                }
+            )
+        }
+
+        val cancel: () -> Unit = {
+            val snapshot = baseline
+            scope.launch(Dispatchers.IO) {
+                if (snapshot != null) {
+                    revertTo(snapshot, tree, titleId)
+                }
+                withContext(Dispatchers.Main) { onClose?.invoke() }
+            }
+        }
+
+        val headerPadding = if (titleId.isEmpty()) 16.dp else 12.dp
+        val header: @Composable (Modifier) -> Unit = { headerModifier ->
+            if (titleId.isEmpty()) {
+                Text(
+                    text = title,
+                    modifier = headerModifier,
+                    color = SettingsStyle.TextPrimary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.2.sp,
+                    lineHeight = 15.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            } else {
+                ConfigSourceSelector(
+                    titleId = titleId,
+                    source = configSource,
+                    entry = recommended,
+                    modifier = headerModifier,
+                    onSelect = { next ->
+                        scope.launch(Dispatchers.IO) {
+                            RecommendedConfigs.setSource(context, titleId, next)
+                            withContext(Dispatchers.Main) { reloadToken++ }
                         }
-                    } else if (node == null) {
-                        Box(Modifier.fillMaxSize())
-                    } else {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                                .padding(horizontal = 20.dp, vertical = 14.dp),
-                            verticalArrangement = Arrangement.spacedBy(Dimens.SectionGap)
-                        ) {
-                            key(resetToken) {
-                                SettingsNodeContent(
-                                    node = node,
-                                    path = entry.path.joinToString("@@"),
-                                    titleId = titleId,
-                                    includeSubGroups = entry.parent != null
-                                )
-                            }
-                            Spacer(Modifier.height(Dimens.SectionGap))
+                    }
+                )
+            }
+        }
+
+        val actions: @Composable () -> Unit = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                GhostButton(
+                    label = stringResource(R.string.settings_save),
+                    accent = true,
+                    tint = Rpcs.Success,
+                    horizontalPadding = 6.dp,
+                    onClick = save,
+                    modifier = Modifier.weight(1f)
+                )
+                GhostButton(
+                    label = stringResource(R.string.settings_reset),
+                    accent = true,
+                    tint = Rpcs.Warning,
+                    horizontalPadding = 6.dp,
+                    onClick = reset,
+                    modifier = Modifier.weight(1f)
+                )
+                GhostButton(
+                    label = stringResource(R.string.settings_cancel),
+                    accent = true,
+                    tint = Rpcs.Danger,
+                    horizontalPadding = 6.dp,
+                    onClick = cancel,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        val section: @Composable () -> Unit = {
+            AnimatedContent(
+                targetState = selected,
+                transitionSpec = {
+                    val direction = if (targetState > initialState) 1 else -1
+                    (slideInHorizontally(tween(220)) { direction * it / 6 } + fadeIn(tween(200)))
+                        .togetherWith(
+                            slideOutHorizontally(tween(180)) { -direction * it / 6 } +
+                                fadeOut(tween(120))
+                        )
+                },
+                label = "settingsSection"
+            ) { index ->
+                val entry = categories.getOrNull(index)
+                val name = entry?.label
+                val node = entry?.let { e ->
+                    var cursor: JSONObject? = tree
+                    for (step in e.path) cursor = cursor?.optJSONObject(step)
+                    cursor
+                }
+
+                if (name == DriverCategory) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 20.dp, vertical = 14.dp)
+                    ) {
+                        GameDriverSettings(titleId)
+                    }
+                } else if (name == ControlsCategory) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 20.dp, vertical = 14.dp)
+                    ) {
+                        ControlsSettings()
+                    }
+                } else if (node == null) {
+                    Box(Modifier.fillMaxSize())
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(Dimens.SectionGap)
+                    ) {
+                        key(resetToken) {
+                            SettingsNodeContent(
+                                node = node,
+                                path = entry.path.joinToString("@@"),
+                                titleId = titleId,
+                                includeSubGroups = entry.parent != null
+                            )
                         }
+                        Spacer(Modifier.height(Dimens.SectionGap))
                     }
                 }
             }
         }
+
+        CompositionLocalProvider(LocalPaneCompact provides compact) {
+            if (compact) {
+                val strip = rememberLazyListState()
+                LaunchedEffect(selected) { strip.animateScrollToItem(selected) }
+
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SettingsStyle.SidebarBg)
+                            .padding(top = 12.dp)
+                    ) {
+                        header(
+                            Modifier.padding(
+                                start = headerPadding,
+                                end = headerPadding,
+                                bottom = 8.dp
+                            )
+                        )
+                        LazyRow(
+                            state = strip,
+                            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            itemsIndexed(categories) { index, entry ->
+                                CategoryChip(
+                                    icon = iconForCategory(entry.label),
+                                    label = entry.parent?.let { "$it · ${labelOf(entry)}" }
+                                        ?: labelOf(entry),
+                                    isSelected = index == selected,
+                                    onClick = { selected = index }
+                                )
+                            }
+                        }
+                    }
+
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(SettingsStyle.Divider)
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .background(SettingsStyle.ContentBg)
+                    ) {
+                        section()
+                    }
+
+                    if (onClose != null) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(SettingsStyle.Divider)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(SettingsStyle.SidebarBg)
+                                .padding(vertical = 8.dp)
+                        ) {
+                            actions()
+                        }
+                    }
+                }
+            } else {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Column(
+                        modifier = Modifier
+                            .width(SettingsStyle.SidebarWidth)
+                            .fillMaxHeight()
+                            .background(SettingsStyle.SidebarBg)
+                            .padding(top = 14.dp, bottom = 12.dp)
+                    ) {
+                        header(
+                            Modifier.padding(
+                                start = headerPadding,
+                                end = headerPadding,
+                                bottom = 10.dp
+                            )
+                        )
+                        Box(
+                            Modifier
+                                .padding(horizontal = 12.dp)
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(SettingsStyle.Divider)
+                        )
+                        Spacer(Modifier.height(8.dp))
+
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(1.dp)
+                        ) {
+                            categories.forEachIndexed { index, entry ->
+                                SidebarItem(
+                                    icon = iconForCategory(entry.label),
+                                    label = labelOf(entry),
+                                    isSelected = index == selected,
+                                    nested = entry.parent != null,
+                                    onClick = { selected = index }
+                                )
+                            }
+                        }
+
+                        if (onClose != null) {
+                            Box(
+                                Modifier
+                                    .padding(horizontal = 12.dp)
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(SettingsStyle.Divider)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            actions()
+                        }
+                    }
+
+                    Box(
+                        Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(SettingsStyle.Divider)
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .background(SettingsStyle.ContentBg)
+                            .widthIn(max = Dims.ContentMaxWidth)
+                    ) {
+                        section()
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryChip(
+    icon: ImageVector,
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .background(
+                if (isSelected) SettingsStyle.AccentBlue.copy(alpha = 0.10f) else Color.Transparent,
+                RoundedCornerShape(8.dp)
+            )
+            .border(
+                1.dp,
+                if (isSelected) SettingsStyle.AccentBlue.copy(alpha = 0.5f) else SettingsStyle.Divider,
+                RoundedCornerShape(8.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (isSelected) SettingsStyle.AccentBlue else SettingsStyle.TextDim,
+            modifier = Modifier.size(Dimens.ControlIconSize)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = label,
+            color = if (isSelected) SettingsStyle.TextPrimary else SettingsStyle.TextSecondary,
+            fontSize = Dimens.ValueSize,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

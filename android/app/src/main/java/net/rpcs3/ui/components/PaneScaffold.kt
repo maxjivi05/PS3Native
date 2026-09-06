@@ -4,10 +4,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,8 +19,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -31,6 +33,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -39,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -46,6 +51,8 @@ import androidx.compose.ui.unit.sp
 import net.rpcs3.R
 import net.rpcs3.ui.theme.Dims
 import net.rpcs3.ui.theme.Rpcs
+
+val LocalPaneCompact = compositionLocalOf { false }
 
 data class PaneTab(
     val label: String,
@@ -64,90 +71,174 @@ fun PaneScaffold(
     contentMaxWidth: Dp = Dims.ContentMaxWidth,
     content: @Composable () -> Unit
 ) {
-    Row(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(Rpcs.Background)
-            .windowInsetsPadding(WindowInsets.systemBars)
+            .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
-        Column(
-            modifier = Modifier
-                .width(Dims.SidebarWidth)
-                .fillMaxHeight()
-                .background(Rpcs.Surface)
-                .padding(top = 12.dp, bottom = 12.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 8.dp, end = 12.dp, bottom = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (onBack != null) {
-                    PaneIconButton(
-                        icon = Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = stringResource(R.string.action_back),
-                        onClick = onBack
+        val compact = maxWidth < Dims.CompactWidth
+
+        CompositionLocalProvider(LocalPaneCompact provides compact) {
+            if (compact) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Rpcs.Surface)
+                            .padding(top = 8.dp, bottom = 8.dp)
+                    ) {
+                        PaneHeader(
+                            title = title,
+                            onBack = onBack,
+                            modifier = Modifier.padding(start = 8.dp, end = 12.dp)
+                        )
+
+                        if (tabs.size > 1) {
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState())
+                                    .padding(horizontal = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                tabs.forEachIndexed { index, tab ->
+                                    PaneTabItem(
+                                        tab = tab,
+                                        isSelected = index == selected,
+                                        onClick = { onSelect(index) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(Rpcs.OutlineSoft)
                     )
-                    Spacer(Modifier.width(2.dp))
+
+                    PaneContent(
+                        scrollableContent = scrollableContent,
+                        contentMaxWidth = contentMaxWidth,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        content = content
+                    )
                 }
-                Text(
-                    text = title,
-                    color = Rpcs.TextPrimary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            } else {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Column(
+                        modifier = Modifier
+                            .width(Dims.SidebarWidth)
+                            .fillMaxHeight()
+                            .background(Rpcs.Surface)
+                            .padding(top = 12.dp, bottom = 12.dp)
+                    ) {
+                        PaneHeader(
+                            title = title,
+                            onBack = onBack,
+                            modifier = Modifier.padding(start = 8.dp, end = 12.dp, bottom = 10.dp)
+                        )
 
-            PaneDivider()
-            Spacer(Modifier.height(8.dp))
+                        PaneDivider()
+                        Spacer(Modifier.height(8.dp))
 
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                tabs.forEachIndexed { index, tab ->
-                    PaneTabItem(
-                        tab = tab,
-                        isSelected = index == selected,
-                        onClick = { onSelect(index) }
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            tabs.forEachIndexed { index, tab ->
+                                PaneTabItem(
+                                    tab = tab,
+                                    isSelected = index == selected,
+                                    onClick = { onSelect(index) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Box(
+                        Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(Rpcs.OutlineSoft)
+                    )
+
+                    PaneContent(
+                        scrollableContent = scrollableContent,
+                        contentMaxWidth = contentMaxWidth,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        content = content
                     )
                 }
             }
         }
+    }
+}
 
-        Box(
-            Modifier
-                .width(1.dp)
-                .fillMaxHeight()
-                .background(Rpcs.OutlineSoft)
+@Composable
+private fun PaneHeader(
+    title: String,
+    onBack: (() -> Unit)?,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (onBack != null) {
+            PaneIconButton(
+                icon = Icons.AutoMirrored.Outlined.ArrowBack,
+                contentDescription = stringResource(R.string.action_back),
+                onClick = onBack
+            )
+            Spacer(Modifier.width(2.dp))
+        }
+        Text(
+            text = title,
+            color = Rpcs.TextPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
+    }
+}
 
-        Box(
+@Composable
+private fun PaneContent(
+    scrollableContent: Boolean,
+    contentMaxWidth: Dp,
+    modifier: Modifier,
+    content: @Composable () -> Unit
+) {
+    Box(modifier = modifier.background(Rpcs.Background)) {
+        Column(
             modifier = Modifier
-                .weight(1f)
                 .fillMaxHeight()
-                .background(Rpcs.Background)
+                .widthIn(max = contentMaxWidth)
+                .padding(Dims.ScreenPadding)
+                .then(
+                    if (scrollableContent) {
+                        Modifier.verticalScroll(rememberScrollState())
+                    } else {
+                        Modifier
+                    }
+                )
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .widthIn(max = contentMaxWidth)
-                    .padding(Dims.ScreenPadding)
-                    .then(
-                        if (scrollableContent) {
-                            Modifier.verticalScroll(rememberScrollState())
-                        } else {
-                            Modifier
-                        }
-                    )
-            ) {
-                content()
-            }
+            content()
         }
     }
 }
@@ -167,15 +258,14 @@ fun PaneDivider(modifier: Modifier = Modifier) {
 private fun PaneTabItem(
     tab: PaneTab,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp)
+        modifier = modifier
             .background(
                 if (isSelected) Rpcs.SelectionFill else Color.Transparent,
                 RoundedCornerShape(Dims.RowCorner)
@@ -416,7 +506,7 @@ fun PaneProgressOverlay(
                 indication = null,
                 onClick = {}
             )
-            .windowInsetsPadding(WindowInsets.systemBars)
+            .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(Dims.ScreenPadding),
         contentAlignment = Alignment.Center
     ) {
@@ -579,13 +669,14 @@ fun PaneKeyValue(label: String, value: String, valueColor: Color = Rpcs.TextPrim
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
             text = label,
             color = Rpcs.TextSecondary,
             fontSize = 12.sp,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f, fill = false)
         )
         Spacer(Modifier.width(12.dp))
         Text(
@@ -594,7 +685,9 @@ fun PaneKeyValue(label: String, value: String, valueColor: Color = Rpcs.TextPrim
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f, fill = false)
         )
     }
 }

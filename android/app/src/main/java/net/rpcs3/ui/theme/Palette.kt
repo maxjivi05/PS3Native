@@ -37,6 +37,7 @@ object Dims {
     val WideContentMaxWidth = 820.dp
     val ChannelColumnMinWidth = 300.dp
     val SidebarWidth = 232.dp
+    val CompactWidth = 600.dp
     val CardCorner = 14.dp
     val InputCorner = 10.dp
     val RowCorner = 10.dp

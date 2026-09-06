@@ -186,9 +186,15 @@ private fun CatalogHeader(row: CatalogRow.Header) {
 private fun CatalogEntry(patch: CatalogPatch) {
     val detail = buildList {
         if (patch.serials.isNotEmpty()) add(patch.serials)
-        if (patch.appVersions.isNotEmpty()) add("app " + patch.appVersions)
-        if (patch.author.isNotEmpty()) add("by " + patch.author)
-        if (patch.patchVersion.isNotEmpty()) add("v" + patch.patchVersion)
+        if (patch.appVersions.isNotEmpty()) {
+            add(stringResource(R.string.patches_detail_app_version, patch.appVersions))
+        }
+        if (patch.author.isNotEmpty()) {
+            add(stringResource(R.string.patches_detail_author, patch.author))
+        }
+        if (patch.patchVersion.isNotEmpty()) {
+            add(stringResource(R.string.version_prefix, patch.patchVersion))
+        }
     }.joinToString(" · ")
 
     Column(

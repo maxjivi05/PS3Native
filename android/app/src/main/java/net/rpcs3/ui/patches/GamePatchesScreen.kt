@@ -189,11 +189,15 @@ fun GamePatchesScreen(
                         files.forEach { file ->
                             PaneEntryRow(
                                 title = file.name,
-                                subtitle = pluralStringResource(
-                                    R.plurals.patches_count,
-                                    file.patchCount,
-                                    file.patchCount
-                                ) + "  ·  " + PackageInspector.formatSize(context, file.size),
+                                subtitle = stringResource(
+                                    R.string.patches_file_detail,
+                                    pluralStringResource(
+                                        R.plurals.patches_count,
+                                        file.patchCount,
+                                        file.patchCount
+                                    ),
+                                    PackageInspector.formatSize(context, file.size)
+                                ),
                                 actionIcon = Icons.Outlined.Delete,
                                 actionDescription = stringResource(R.string.action_delete),
                                 onAction = {

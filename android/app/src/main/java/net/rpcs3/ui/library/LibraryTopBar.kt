@@ -8,13 +8,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -49,10 +51,12 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.annotation.StringRes
 import net.rpcs3.R
+import net.rpcs3.ui.theme.Dims
 import net.rpcs3.ui.theme.SettingsStyle
 
 enum class LibraryTab(@StringRes val labelRes: Int) {
@@ -88,62 +92,8 @@ fun LibraryTopBar(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .windowInsetsPadding(
-                WindowInsets.systemBars.only(
-                    WindowInsetsSides.Horizontal + WindowInsetsSides.Top
-                )
-            )
-            .fillMaxWidth()
-            .height(64.dp)
-    ) {
-        if (!searchOpen) {
-            Box(modifier = Modifier.align(Alignment.Center)) {
-                TabPill(selectedTab = selectedTab, onTabSelected = onTabSelected)
-            }
-        } else {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth()
-                    .padding(start = 108.dp, end = 62.dp)
-                    .height(40.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(SettingsStyle.InputSurface)
-                    .border(1.dp, SettingsStyle.InputBorder, RoundedCornerShape(18.dp))
-                    .padding(horizontal = 14.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                if (searchQuery.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.library_search_placeholder),
-                        color = SettingsStyle.TextDim,
-                        fontSize = 13.sp
-                    )
-                }
-                BasicTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
-                    singleLine = true,
-                    cursorBrush = SolidColor(SettingsStyle.AccentBlue),
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        color = SettingsStyle.TextPrimary,
-                        fontSize = 13.sp
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester)
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+    val leading: @Composable () -> Unit = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             BarIcon(
                 icon = Icons.Filled.Menu,
                 contentDescription = stringResource(R.string.library_menu),
@@ -156,13 +106,10 @@ fun LibraryTopBar(
                 onClick = { searchOpen = !searchOpen }
             )
         }
+    }
 
-        Row(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+    val actions: @Composable () -> Unit = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             trailing()
             Box {
                 BarIcon(
@@ -199,10 +146,111 @@ fun LibraryTopBar(
             }
         }
     }
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .windowInsetsPadding(
+                WindowInsets.safeDrawing.only(
+                    WindowInsetsSides.Horizontal + WindowInsetsSides.Top
+                )
+            )
+            .fillMaxWidth()
+            .height(64.dp)
+    ) {
+        val compact = maxWidth < Dims.CompactWidth
+
+        if (searchOpen) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .padding(start = 108.dp, end = 62.dp)
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(SettingsStyle.InputSurface)
+                    .border(1.dp, SettingsStyle.InputBorder, RoundedCornerShape(18.dp))
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                if (searchQuery.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.library_search_placeholder),
+                        color = SettingsStyle.TextDim,
+                        fontSize = 13.sp
+                    )
+                }
+                BasicTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    singleLine = true,
+                    cursorBrush = SolidColor(SettingsStyle.AccentBlue),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = SettingsStyle.TextPrimary,
+                        fontSize = 13.sp
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester)
+                )
+            }
+        } else if (!compact) {
+            Box(modifier = Modifier.align(Alignment.Center)) {
+                TabPill(
+                    selectedTab = selectedTab,
+                    onTabSelected = onTabSelected,
+                    cellWidth = 118.dp
+                )
+            }
+        }
+
+        if (compact && !searchOpen) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                leading()
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TabPill(
+                        selectedTab = selectedTab,
+                        onTabSelected = onTabSelected,
+                        cellWidth = 104.dp
+                    )
+                }
+                actions()
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                leading()
+            }
+
+            Row(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                actions()
+            }
+        }
+    }
 }
 
 @Composable
-private fun TabPill(selectedTab: LibraryTab, onTabSelected: (LibraryTab) -> Unit) {
+private fun TabPill(
+    selectedTab: LibraryTab,
+    onTabSelected: (LibraryTab) -> Unit,
+    cellWidth: Dp
+) {
     Row(
         modifier = Modifier
             .height(44.dp)
@@ -218,6 +266,7 @@ private fun TabPill(selectedTab: LibraryTab, onTabSelected: (LibraryTab) -> Unit
             TabCell(
                 label = stringResource(tab.labelRes),
                 selected = tab == selectedTab,
+                width = cellWidth,
                 onClick = { onTabSelected(tab) }
             )
         }
@@ -225,13 +274,13 @@ private fun TabPill(selectedTab: LibraryTab, onTabSelected: (LibraryTab) -> Unit
 }
 
 @Composable
-private fun TabCell(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun TabCell(label: String, selected: Boolean, width: Dp, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val scale by animateFloatAsState(if (selected) 1f else 0.98f, label = "tabScale")
 
     Box(
         modifier = Modifier
-            .width(118.dp)
+            .width(width)
             .height(36.dp)
             .graphicsLayer {
                 scaleX = scale
