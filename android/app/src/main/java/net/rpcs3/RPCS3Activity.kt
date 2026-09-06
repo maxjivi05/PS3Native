@@ -72,6 +72,7 @@ class RPCS3Activity : ComponentActivity() {
             finish()
             return
         }
+        RPCS3.instance.surfaceHostAlive(true)
         binding = ActivityRpcs3Binding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -563,6 +564,7 @@ class RPCS3Activity : ComponentActivity() {
             RPCS3.activeGame.value = null
         }
         unregisterUsbEventListener()
+        RPCS3.instance.surfaceHostAlive(false)
         bootThread?.interrupt()
         bootThread?.join()
         runCatching { isoDescriptor?.close() }
