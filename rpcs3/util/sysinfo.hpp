@@ -67,6 +67,8 @@ namespace utils
 
 	bool has_sve2();
 
+	bool has_wfe_event_stream();
+
 	int sve_length();
 #endif
 	std::string get_cpu_brand();

@@ -59,6 +59,7 @@ DYNAMIC_IMPORT_RENAME("Kernel32.dll", SetThreadDescriptionImport, "SetThreadDesc
 #endif
 #ifdef __linux__
 #include <fcntl.h>
+#include <sys/prctl.h>
 #include <sys/syscall.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
@@ -2991,6 +2992,7 @@ void thread_base::initialize(void (*error_cb)())
 #elif defined(ANDROID)
 	const u64 new_tid = pthread_self();
 	m_native_tid = static_cast<u32>(gettid());
+	prctl(PR_SET_TIMERSLACK, 1, 0, 0, 0);
 #else
 	const u64 new_tid = reinterpret_cast<u64>(pthread_self());
 #endif

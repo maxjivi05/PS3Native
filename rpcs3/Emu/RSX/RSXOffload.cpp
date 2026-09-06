@@ -79,7 +79,7 @@ namespace rsx
 				if (m_enqueued_count.load() == m_processed_count.load())
 				{
 					m_processed_count.notify_all();
-					std::this_thread::yield();
+					m_work_queue.get_wait_atomic().wait(0, atomic_wait_timeout{5'000'000});
 				}
 			}
 
@@ -178,10 +178,31 @@ namespace rsx
 				return false;
 			}
 
-			while (_thr.m_enqueued_count.load() > _thr.m_processed_count.load())
+			u32 spins = 0;
+
+			while (true)
 			{
+				const u64 processed = _thr.m_processed_count.load();
+
+				if (_thr.m_enqueued_count.load() <= processed)
+				{
+					break;
+				}
+
 				rsxthr->on_semaphore_acquire_wait();
-				utils::pause();
+
+				if (++spins < 500 || static_cast<thread_state>(_thr) != thread_state::created)
+				{
+					utils::pause();
+					continue;
+				}
+
+				if (_thr.m_processed_count.load() != processed)
+				{
+					continue;
+				}
+
+				_thr.m_processed_count.wait(processed, atomic_wait_timeout{100'000});
 			}
 		}
 		else
