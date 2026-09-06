@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Healing
+import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
@@ -82,6 +83,7 @@ import kotlinx.coroutines.launch
 import net.rpcs3.EmulatorState
 import net.rpcs3.FirmwareRepository
 import net.rpcs3.PrecompilerService
+import net.rpcs3.ui.support.SupportScreen
 import net.rpcs3.PrecompilerServiceAction
 import net.rpcs3.ProgressRepository
 import net.rpcs3.R
@@ -168,6 +170,7 @@ fun AppNavHost() {
                 },
                 navigateToDiagnostics = { navController.navigate("diagnostics") },
                 navigateToDebug = { navController.navigate("debug") },
+                navigateToSupport = { navController.navigate("support") },
                 navigateToFrameGen = { navController.navigate("frameGen") },
                 drawerState
             )
@@ -228,6 +231,10 @@ fun AppNavHost() {
                 navigateToDiagnostics = { navController.navigate("diagnostics") },
                 onClose = navController::navigateUp
             )
+        }
+
+        composable(route = "support") {
+            SupportScreen(onClose = navController::navigateUp)
         }
 
         composable(
@@ -323,6 +330,7 @@ fun GamesDestination(
     navigateToGameUpdates: (titleId: String) -> Unit,
     navigateToDiagnostics: () -> Unit,
     navigateToDebug: () -> Unit,
+    navigateToSupport: () -> Unit,
     navigateToFrameGen: () -> Unit,
     drawerState: androidx.compose.material3.DrawerState
 ) {
@@ -599,6 +607,16 @@ fun GamesDestination(
                             }
                         }
                     )
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.drawer_support)) },
+                        selected = false,
+                        icon = { Icon(Icons.Outlined.HelpOutline, null) },
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navigateToSupport()
+                        }
+                    )
+
                 NavigationDrawerItem(
                         label = { Text(stringResource(R.string.drawer_setup)) },
                         selected = false,
