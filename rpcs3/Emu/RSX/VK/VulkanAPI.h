@@ -121,4 +121,6 @@ namespace vk
 namespace vk
 {
 	void init();
+
+	inline VkBool32 to_bool32(bool x) { return x ? VK_TRUE : VK_FALSE; }
 }
