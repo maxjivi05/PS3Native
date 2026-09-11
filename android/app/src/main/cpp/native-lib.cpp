@@ -1955,12 +1955,16 @@ extern "C" JNIEXPORT jstring JNICALL Java_net_rpcs3_RPCS3_frameGenState(
 
 extern "C" JNIEXPORT void JNICALL Java_net_rpcs3_RPCS3_frameGenConfigure(
     JNIEnv *, jobject, jboolean enabled, jint multiplier, jint targetRate,
-    jint flowScalePercent) {
+    jint flowScalePercent, jint engine, jint disMinSide) {
   vk::frame_generation_settings settings{};
   settings.enabled = enabled == JNI_TRUE;
   settings.multiplier = static_cast<u32>(std::max<jint>(multiplier, 2));
   settings.target_rate = static_cast<u32>(std::max<jint>(targetRate, 0));
   settings.flow_scale_percent = static_cast<u32>(std::max<jint>(flowScalePercent, 25));
+  settings.engine = engine == static_cast<jint>(vk::frame_generation_engine::dis)
+                        ? vk::frame_generation_engine::dis
+                        : vk::frame_generation_engine::lsfg;
+  settings.dis_min_side = static_cast<u32>(std::clamp<jint>(disMinSide, 64, 1080));
   vk::set_frame_generation_settings(settings);
 }
 

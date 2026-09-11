@@ -31,7 +31,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.rpcs3.R
 import net.rpcs3.dialogs.AlertDialogQueue
+import net.rpcs3.framegen.DisFlowPreset
 import net.rpcs3.framegen.FrameGen
+import net.rpcs3.framegen.FrameGenEngine
 import net.rpcs3.framegen.FrameGenImportResult
 import net.rpcs3.framegen.FrameGenPrefs
 import net.rpcs3.framegen.FrameGenPreset
@@ -64,7 +66,11 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
     var multiplier by remember { mutableIntStateOf(FrameGenPrefs.multiplier(prefs)) }
     var targetRate by remember { mutableIntStateOf(FrameGenPrefs.targetRate(prefs)) }
     var preset by remember { mutableStateOf(FrameGenPrefs.preset(prefs)) }
+    var engine by remember { mutableStateOf(FrameGenPrefs.engine(prefs)) }
+    var disPreset by remember { mutableStateOf(FrameGenPrefs.disPreset(prefs)) }
     var importing by remember { mutableStateOf(false) }
+
+    val usable = !engine.needsShaderSource || state.imported
 
     LaunchedEffect(Unit) { FrameGen.refresh(context) }
 
@@ -94,33 +100,56 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Dimens.SectionGap)
     ) {
-        SettingsSection(title = stringResource(R.string.framegen_section_source)) {
+        SettingsSection(title = stringResource(R.string.framegen_section_engine)) {
             SettingGroup {
-                Text(
-                    text = when {
-                        importing -> stringResource(R.string.framegen_source_importing)
-                        state.imported && state.sourceName.isNotEmpty() ->
-                            stringResource(
-                                R.string.framegen_source_loaded_named,
-                                state.sourceName,
-                                state.modules,
-                                state.variant
-                            )
+                ChipRow {
+                    FrameGenEngine.entries.forEach { candidate ->
+                        SettingChip(
+                            label = stringResource(candidate.labelRes),
+                            detail = stringResource(candidate.detailRes),
+                            selected = candidate == engine,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                engine = candidate
+                                FrameGen.selectEngine(context, candidate)
+                            }
+                        )
+                    }
+                }
+            }
 
-                        state.imported ->
-                            stringResource(
-                                R.string.framegen_source_loaded,
-                                state.modules,
-                                state.variant
-                            )
+            SettingsHint(text = stringResource(engine.noteRes))
+        }
 
-                        else -> stringResource(R.string.framegen_source_missing)
-                    },
-                    color = if (state.imported) Rpcs.TextPrimary else Rpcs.TextSecondary,
-                    fontSize = Dimens.ValueSize,
-                    fontWeight = if (state.imported) FontWeight.Medium else FontWeight.Normal,
-                    lineHeight = 16.sp
-                )
+        if (engine.needsShaderSource) {
+            SettingsSection(title = stringResource(R.string.framegen_section_source)) {
+                SettingGroup {
+                    Text(
+                        text = when {
+                            importing -> stringResource(R.string.framegen_source_importing)
+                            state.imported && state.sourceName.isNotEmpty() ->
+                                stringResource(
+                                    R.string.framegen_source_loaded_named,
+                                    state.sourceName,
+                                    state.modules,
+                                    state.variant
+                                )
+
+                            state.imported ->
+                                stringResource(
+                                    R.string.framegen_source_loaded,
+                                    state.modules,
+                                    state.variant
+                                )
+
+                            else -> stringResource(R.string.framegen_source_missing)
+                        },
+                        color = if (state.imported) Rpcs.TextPrimary else Rpcs.TextSecondary,
+                        fontSize = Dimens.ValueSize,
+                        fontWeight = if (state.imported) FontWeight.Medium else FontWeight.Normal,
+                        lineHeight = 16.sp
+                    )
+                }
             }
         }
 
@@ -129,14 +158,14 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
                 SettingSwitch(
                     label = stringResource(R.string.framegen_enable),
                     subtitle = stringResource(
-                        if (state.imported) {
+                        if (usable) {
                             R.string.framegen_enable_hint
                         } else {
                             R.string.framegen_enable_blocked
                         }
                     ),
-                    checked = enabled && state.imported,
-                    enabled = state.imported,
+                    checked = enabled && usable,
+                    enabled = usable,
                     onCheckedChange = { wanted ->
                         enabled = wanted
                         FrameGenPrefs.setEnabled(prefs, wanted)
@@ -167,7 +196,7 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
                             }
                         ),
                         selected = candidate == targetRate,
-                        enabled = state.imported,
+                        enabled = usable,
                         modifier = Modifier.weight(1f),
                         onClick = {
                             targetRate = candidate
@@ -192,7 +221,7 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
                                     candidate - 1
                                 ),
                                 selected = candidate == multiplier,
-                                enabled = state.imported,
+                                enabled = usable,
                                 modifier = Modifier.weight(1f),
                                 onClick = {
                                     multiplier = candidate
@@ -208,18 +237,46 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
 
                 ThinDivider()
 
-                PresetRow(
-                    selected = preset,
-                    enabled = state.imported,
-                    onSelected = { chosen ->
-                        preset = chosen
-                        FrameGenPrefs.setPreset(prefs, chosen)
-                        FrameGen.push(context)
+                if (engine == FrameGenEngine.Dis) {
+                    LabelledChipRow(label = stringResource(R.string.framegen_label_dis_scale)) {
+                        DisFlowPreset.entries.forEach { candidate ->
+                            SettingChip(
+                                label = stringResource(candidate.labelRes),
+                                detail = stringResource(
+                                    R.string.framegen_dis_scale_detail,
+                                    candidate.minSide
+                                ),
+                                selected = candidate == disPreset,
+                                enabled = usable,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    disPreset = candidate
+                                    FrameGenPrefs.setDisPreset(prefs, candidate)
+                                    FrameGen.push(context)
+                                }
+                            )
+                        }
                     }
-                )
+                } else {
+                    PresetRow(
+                        selected = preset,
+                        enabled = usable,
+                        onSelected = { chosen ->
+                            preset = chosen
+                            FrameGenPrefs.setPreset(prefs, chosen)
+                            FrameGen.push(context)
+                        }
+                    )
+                }
             }
 
-            SettingsHint(text = stringResource(preset.descriptionRes))
+            SettingsHint(
+                text = if (engine == FrameGenEngine.Dis) {
+                    stringResource(R.string.framegen_dis_scale_note, disPreset.minSide)
+                } else {
+                    stringResource(preset.descriptionRes)
+                }
+            )
         }
 
         SettingsSection(title = stringResource(R.string.framegen_section_status)) {
@@ -258,39 +315,41 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
             SettingsHint(text = stringResource(R.string.framegen_latency_note))
         }
 
-        SettingsSection(title = stringResource(R.string.framegen_section_manage)) {
-            SettingsHint(text = stringResource(R.string.framegen_source_hint))
+        if (engine.needsShaderSource) {
+            SettingsSection(title = stringResource(R.string.framegen_section_manage)) {
+                SettingsHint(text = stringResource(R.string.framegen_source_hint))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.ItemGap)) {
-                GhostButton(
-                    label = stringResource(
-                        if (state.imported) {
-                            R.string.framegen_source_replace
-                        } else {
-                            R.string.framegen_source_select
-                        }
-                    ),
-                    accent = true,
-                    enabled = !importing,
-                    modifier = Modifier.weight(1f),
-                    onClick = { picker.launch(arrayOf("*/*")) }
-                )
-
-                if (state.imported) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Dimens.ItemGap)) {
                     GhostButton(
-                        label = stringResource(R.string.framegen_source_remove),
+                        label = stringResource(
+                            if (state.imported) {
+                                R.string.framegen_source_replace
+                            } else {
+                                R.string.framegen_source_select
+                            }
+                        ),
                         accent = true,
-                        tint = Rpcs.Danger,
                         enabled = !importing,
                         modifier = Modifier.weight(1f),
-                        onClick = {
-                            scope.launch {
-                                withContext(Dispatchers.IO) { FrameGen.forget(context) }
-                                enabled = false
-                                FrameGenPrefs.setEnabled(prefs, false)
-                            }
-                        }
+                        onClick = { picker.launch(arrayOf("*/*")) }
                     )
+
+                    if (state.imported) {
+                        GhostButton(
+                            label = stringResource(R.string.framegen_source_remove),
+                            accent = true,
+                            tint = Rpcs.Danger,
+                            enabled = !importing,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                scope.launch {
+                                    withContext(Dispatchers.IO) { FrameGen.forget(context) }
+                                    enabled = false
+                                    FrameGenPrefs.setEnabled(prefs, false)
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -337,7 +396,16 @@ private fun PresetRow(
 }
 
 @Composable
-private fun LabelledChipRow(label: String, content: @Composable () -> Unit) {
+private fun ChipRow(content: @Composable RowScope.() -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.TightGap),
+        content = content
+    )
+}
+
+@Composable
+private fun LabelledChipRow(label: String, content: @Composable RowScope.() -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = label,
@@ -346,10 +414,7 @@ private fun LabelledChipRow(label: String, content: @Composable () -> Unit) {
             fontWeight = FontWeight.Medium
         )
         Spacer(Modifier.height(Dimens.TightGap))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Dimens.TightGap)
-        ) { content() }
+        ChipRow(content = content)
     }
 }
 

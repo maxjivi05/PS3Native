@@ -502,6 +502,14 @@
     <string name="framegen_title">Frame Gen</string>
     <string name="framegen_tab">Frame generation</string>
 
+    <string name="framegen_section_engine">Engine</string>
+    <string name="framegen_engine_lsfg">Lossless Scaling</string>
+    <string name="framegen_engine_lsfg_detail">imported shaders</string>
+    <string name="framegen_engine_lsfg_note">Interpolates with the Lossless Scaling shader chain. Import Lossless.dll once and it is translated and cached for this device.</string>
+    <string name="framegen_engine_dis">DIS</string>
+    <string name="framegen_engine_dis_detail">built in</string>
+    <string name="framegen_engine_dis_note">Interpolates with Dense Inverse Search, built into the app. Nothing to import, and it runs on any GPU that passes the pipeline checks.</string>
+
     <string name="framegen_section_source">Shader source</string>
     <string name="framegen_section_generation">Generation</string>
     <string name="framegen_section_status">Status</string>
@@ -528,7 +536,7 @@
 
     <string name="framegen_enable">Frame generation</string>
     <string name="framegen_enable_hint">Interpolates extra frames between rendered ones</string>
-    <string name="framegen_enable_blocked">Import Lossless.dll first</string>
+    <string name="framegen_enable_blocked">Import Lossless.dll first, or switch to DIS</string>
     <string name="framegen_multiplier_value">%1$d×</string>
     <string name="framegen_multiplier_detail">+%1$d frames</string>
     <string name="framegen_target_value">%1$d fps</string>
@@ -550,6 +558,13 @@
     <string name="framegen_preset_performance_note" formatted="false">Motion estimated at 50% resolution. Around 46% of Quality\'s GPU cost, with almost no visible loss.</string>
     <string name="framegen_preset_balanced_note" formatted="false">Motion estimated at 70% resolution. Around 61% of Quality\'s GPU cost. Recommended for handhelds.</string>
     <string name="framegen_preset_quality_note" formatted="false">Motion estimated at full resolution. Highest cost; use it only when the game has GPU headroom to spare.</string>
+    <string name="framegen_label_dis_scale">Resolution scale</string>
+    <string name="framegen_dis_preset_fast">Fast</string>
+    <string name="framegen_dis_preset_balanced">Balanced</string>
+    <string name="framegen_dis_preset_quality">Quality</string>
+    <string name="framegen_dis_scale_detail">%1$d px</string>
+    <string name="framegen_dis_scale_note">Motion is searched at %1$d pixels on the shorter side of the frame, whatever the game outputs. Lower is cheaper; higher tracks small or fast detail better.</string>
+
     <string name="framegen_runtime_active_motion">Running at %1$d \u00d7 %2$d. The game outputs %3$d \u00d7 %4$d, so motion is searched at %5$d \u00d7 %6$d.</string>
     <string name="framegen_runtime_active">Running at %1$d × %2$d.</string>
     <string name="framegen_runtime_idle">Starts once a game is running.</string>

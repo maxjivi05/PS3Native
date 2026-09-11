@@ -7,6 +7,7 @@
 #include "lsfg/lsfg_chain.hpp"
 #include "lsfg/lsfg_pacer.hpp"
 #include "lsfg/lsfg_shaders.hpp"
+#include "dis/dis_flow.h"
 
 #include <algorithm>
 #include <array>
@@ -34,6 +35,9 @@ namespace vk
 
 		constexpr u64 acquire_timeout_min_ns = 3'000'000;
 		constexpr u64 acquire_timeout_max_ns = 12'000'000;
+
+		constexpr u32 dis_min_side_min = 128;
+		constexpr u32 dis_min_side_max = 720;
 
 		constexpr float flow_scale_min = 0.25f;
 		constexpr float flow_scale_max = 1.f;
@@ -86,9 +90,20 @@ namespace vk
 	void set_frame_generation_settings(const frame_generation_settings& settings)
 	{
 		std::lock_guard lock(g_frame_generation_lock);
+
+		const frame_generation_engine previous_engine = g_frame_generation_settings.engine;
+		const u32 previous_min_side = g_frame_generation_settings.dis_min_side;
+
 		g_frame_generation_settings = settings;
 		g_frame_generation_settings.multiplier = std::clamp<u32>(settings.multiplier, 2, max_generated_frames + 1);
 		g_frame_generation_settings.flow_scale_percent = std::clamp<u32>(settings.flow_scale_percent, 25, 100);
+		g_frame_generation_settings.dis_min_side = std::clamp<u32>(settings.dis_min_side, dis_min_side_min, dis_min_side_max);
+
+		if (g_frame_generation_settings.engine != previous_engine ||
+			g_frame_generation_settings.dis_min_side != previous_min_side)
+		{
+			g_frame_generation_revision.fetch_add(1, std::memory_order_relaxed);
+		}
 	}
 
 	frame_generation_settings get_frame_generation_settings()
@@ -126,7 +141,12 @@ namespace vk
 	{
 		const auto settings = get_frame_generation_settings();
 
-		if (!settings.enabled || get_frame_generation_shader_cache().empty())
+		if (!settings.enabled)
+		{
+			return 0;
+		}
+
+		if (settings.engine == frame_generation_engine::lsfg && get_frame_generation_shader_cache().empty())
 		{
 			return 0;
 		}
@@ -180,6 +200,10 @@ namespace vk
 		lsfg::LsfgPacer pacer;
 		lsfg::LsfgPlan plan{};
 
+		std::unique_ptr<dis::DisFlow> flow;
+		frame_generation_engine engine = frame_generation_engine::lsfg;
+		u32 built_min_side = 0;
+
 		VkExtent2D built_extent{};
 		VkExtent2D peak_guest_extent{};
 		VkFormat built_format = VK_FORMAT_UNDEFINED;
@@ -192,6 +216,16 @@ namespace vk
 		u32 warm_streak = 0;
 		bool warm = false;
 		bool generating = false;
+
+		bool ready() const
+		{
+			if (engine == frame_generation_engine::dis)
+			{
+				return flow && flow->Valid();
+			}
+
+			return chain && chain->Valid();
+		}
 
 		float effective_flow_scale(const frame_generation_settings& settings, u32 output_width) const
 		{
@@ -211,16 +245,38 @@ namespace vk
 	frame_generator::frame_generator(const vk::render_device& dev)
 		: m_device(dev)
 	{
+		const auto settings = get_frame_generation_settings();
+
+		m_impl = std::make_unique<impl>();
+		m_impl->engine = settings.engine;
+		m_impl->device = lsfg::Device(dev, dev.gpu());
+
+		if (settings.engine == frame_generation_engine::dis)
+		{
+			m_impl->flow = std::make_unique<dis::DisFlow>(dev);
+
+			if (!m_impl->flow->Valid())
+			{
+				rsx_log.warning("Frame generation: the DIS engine could not be created on this device");
+				m_impl.reset();
+				m_unavailable = true;
+				return;
+			}
+
+			m_shaders_ready = true;
+			rsx_log.notice("Frame generation: DIS engine ready");
+			return;
+		}
+
 		const std::string cache = get_frame_generation_shader_cache();
 
 		if (cache.empty())
 		{
+			m_impl.reset();
 			m_unavailable = true;
 			return;
 		}
 
-		m_impl = std::make_unique<impl>();
-		m_impl->device = lsfg::Device(dev, dev.gpu());
 		m_impl->shaders = std::make_unique<lsfg::LsfgShaders>(m_impl->device, cache);
 
 		if (!m_impl->shaders->IsValid())
@@ -322,6 +378,51 @@ namespace vk
 		pacer_config.source_rate = static_cast<float>(g_cfg.video.vblank_rate);
 		m_impl->pacer.SetConfig(pacer_config);
 
+		if (m_impl->engine == frame_generation_engine::dis)
+		{
+			if (!m_impl->flow->Configure(settings.dis_min_side, settings.target_rate, pacer_config.refresh_rate))
+			{
+				m_impl->built_extent = VkExtent2D{};
+			}
+
+			if (!m_impl->flow->NeedsRebuild(width, height, format) &&
+				m_impl->built_extent.width == width && m_impl->built_extent.height == height &&
+				m_impl->built_min_side == settings.dis_min_side)
+			{
+				return m_impl->flow->Valid();
+			}
+
+			if (!m_impl->flow->Prepare(width, height, format))
+			{
+				rsx_log.error("Frame generation: the DIS chain could not be built at %ux%u; disabling", width, height);
+				m_unavailable = true;
+				set_frame_generation_status({ .ready = false, .unsupported = true, .width = width, .height = height,
+					.engine = frame_generation_engine::dis });
+				return false;
+			}
+
+			m_impl->built_extent = VkExtent2D{ width, height };
+			m_impl->built_format = format;
+			m_impl->built_min_side = settings.dis_min_side;
+			m_impl->frame_count = 0;
+			m_impl->plan_calls = 0;
+			m_impl->warm_streak = 0;
+			m_impl->warm = false;
+			m_impl->generating = false;
+				m_impl->pacer.Reset();
+
+			const VkExtent2D flow = m_impl->flow->FlowExtent();
+
+			set_frame_generation_status({ .ready = true, .unsupported = false, .width = width, .height = height,
+				.flow_width = flow.width, .flow_height = flow.height,
+				.guest_width = m_impl->peak_guest_extent.width, .guest_height = m_impl->peak_guest_extent.height,
+				.engine = frame_generation_engine::dis });
+			rsx_log.notice("Frame generation: DIS chain built at %ux%u, flow at %ux%u (shorter side %u, game outputs %ux%u)",
+				width, height, flow.width, flow.height, settings.dis_min_side,
+				m_impl->peak_guest_extent.width, m_impl->peak_guest_extent.height);
+			return true;
+		}
+
 		if (m_impl->chain &&
 			m_impl->built_extent.width == width &&
 			m_impl->built_extent.height == height &&
@@ -388,7 +489,7 @@ namespace vk
 
 	u32 frame_generator::plan(u32 capacity)
 	{
-		if (!is_usable() || !m_impl->chain)
+		if (!is_usable() || !m_impl->ready())
 		{
 			return 0;
 		}
@@ -425,7 +526,7 @@ namespace vk
 
 	void frame_generator::process(VkCommandBuffer cmd, VkImage source, VkImageLayout source_layout, u32 width, u32 height, u32 generations)
 	{
-		if (!is_usable() || !m_impl->chain || !m_impl->chain->Valid())
+		if (!is_usable() || !m_impl->ready())
 		{
 			return;
 		}
@@ -433,6 +534,28 @@ namespace vk
 		const u64 count = m_impl->frame_count++;
 		m_impl->last_frame = count;
 		m_impl->last_generations = generations;
+
+		if (m_impl->engine == frame_generation_engine::dis)
+		{
+			const VkImageMemoryBarrier before = make_barrier(source,
+				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+				source_layout, VK_IMAGE_LAYOUT_GENERAL);
+
+			VK_GET_SYMBOL(vkCmdPipelineBarrier)(cmd,
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &before);
+
+			m_impl->flow->Process(cmd, source, width, height, generations);
+
+			const VkImageMemoryBarrier after = make_barrier(source, VK_ACCESS_TRANSFER_READ_BIT,
+				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
+				VK_IMAGE_LAYOUT_GENERAL, source_layout);
+
+			VK_GET_SYMBOL(vkCmdPipelineBarrier)(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				0, 0, nullptr, 0, nullptr, 1, &after);
+			return;
+		}
 
 		auto& destination = m_impl->chain->Input(count);
 
@@ -478,8 +601,20 @@ namespace vk
 
 	void frame_generator::emit(VkCommandBuffer cmd, u32 index, VkImage target, VkImageLayout present_layout, u32 width, u32 height)
 	{
-		if (!is_usable() || !m_impl->chain || !m_impl->chain->Valid() || index >= m_impl->last_generations)
+		if (!is_usable() || !m_impl->ready() || index >= m_impl->last_generations)
 		{
+			return;
+		}
+
+		if (m_impl->engine == frame_generation_engine::dis)
+		{
+			m_impl->flow->GenerateInto(cmd, index, index, target, VK_NULL_HANDLE, width, height, VK_NULL_HANDLE);
+
+			const VkImageMemoryBarrier after = make_barrier(target, VK_ACCESS_TRANSFER_WRITE_BIT, 0,
+				VK_IMAGE_LAYOUT_GENERAL, present_layout);
+
+			VK_GET_SYMBOL(vkCmdPipelineBarrier)(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+				0, 0, nullptr, 0, nullptr, 1, &after);
 			return;
 		}
 
@@ -524,6 +659,11 @@ namespace vk
 		m_impl->warm = false;
 		m_impl->generating = false;
 		m_impl->plan = {};
+
+		if (m_impl->flow)
+		{
+			m_impl->flow->Reset();
+		}
 
 		if (m_impl->chain)
 		{
