@@ -13,12 +13,22 @@ namespace vk
 
 	constexpr u32 max_generated_frames = 3;
 
+	enum class frame_generation_engine : u32
+	{
+		lsfg = 0,
+		dis = 1
+	};
+
+	constexpr u32 dis_min_side_default = 252;
+
 	struct frame_generation_settings
 	{
 		bool enabled = false;
 		u32 multiplier = 2;
 		u32 target_rate = 0;
 		u32 flow_scale_percent = 70;
+		frame_generation_engine engine = frame_generation_engine::lsfg;
+		u32 dis_min_side = dis_min_side_default;
 	};
 
 	struct frame_generation_status

@@ -367,7 +367,7 @@ class RPCS3Activity : ComponentActivity() {
 
     private fun applyFrameGenDisplayMode() {
         val active = display?.mode
-        val enabled = FrameGenPrefs.isEnabled(FrameGenPrefs.of(this)) && FrameGen.state.value.imported
+        val enabled = FrameGenPrefs.isEnabled(FrameGenPrefs.of(this)) && FrameGen.state.value.usable
 
         val wanted = if (active == null || !enabled) {
             0

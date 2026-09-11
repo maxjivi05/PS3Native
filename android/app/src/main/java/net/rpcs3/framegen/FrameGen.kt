@@ -9,6 +9,50 @@ import net.rpcs3.R
 import net.rpcs3.RPCS3
 import org.json.JSONObject
 import java.io.File
+import kotlin.math.abs
+
+enum class FrameGenEngine(
+    val value: Int,
+    val labelRes: Int,
+    val detailRes: Int,
+    val noteRes: Int
+) {
+    Lsfg(
+        value = 0,
+        labelRes = R.string.framegen_engine_lsfg,
+        detailRes = R.string.framegen_engine_lsfg_detail,
+        noteRes = R.string.framegen_engine_lsfg_note
+    ),
+    Dis(
+        value = 1,
+        labelRes = R.string.framegen_engine_dis,
+        detailRes = R.string.framegen_engine_dis_detail,
+        noteRes = R.string.framegen_engine_dis_note
+    );
+
+    val needsShaderSource: Boolean
+        get() = this == Lsfg
+
+    companion object {
+        val Default = Lsfg
+
+        fun fromValue(value: Int): FrameGenEngine =
+            entries.firstOrNull { it.value == value } ?: Default
+    }
+}
+
+enum class DisFlowPreset(val minSide: Int, val labelRes: Int) {
+    Fast(180, R.string.framegen_dis_preset_fast),
+    Balanced(252, R.string.framegen_dis_preset_balanced),
+    Quality(360, R.string.framegen_dis_preset_quality);
+
+    companion object {
+        val Default = Balanced
+
+        fun fromMinSide(value: Int): DisFlowPreset =
+            entries.minByOrNull { abs(it.minSide - value) } ?: Default
+    }
+}
 
 enum class FrameGenImportResult(val code: Int, val messageRes: Int) {
     Ok(0, R.string.framegen_import_ok),
@@ -38,8 +82,12 @@ data class FrameGenState(
     val flowWidth: Int = 0,
     val flowHeight: Int = 0,
     val guestWidth: Int = 0,
-    val guestHeight: Int = 0
-)
+    val guestHeight: Int = 0,
+    val engine: FrameGenEngine = FrameGenEngine.Default
+) {
+    val usable: Boolean
+        get() = !engine.needsShaderSource || imported
+}
 
 object FrameGenPrefs {
     const val NAME = "framegen"
@@ -49,6 +97,8 @@ object FrameGenPrefs {
     private const val KEY_MULTIPLIER = "multiplier"
     private const val KEY_TARGET_RATE = "target_rate"
     private const val KEY_FLOW_SCALE = "flow_scale"
+    private const val KEY_ENGINE = "engine"
+    private const val KEY_DIS_MIN_SIDE = "dis_min_side"
     private const val KEY_SOURCE_NAME = "source_name"
     private const val KEY_IMPORTED_AT = "imported_at"
 
@@ -96,6 +146,20 @@ object FrameGenPrefs {
         prefs.edit().putInt(KEY_FLOW_SCALE, value.flowScale).apply()
     }
 
+    fun engine(prefs: SharedPreferences): FrameGenEngine =
+        FrameGenEngine.fromValue(prefs.getInt(KEY_ENGINE, FrameGenEngine.Default.value))
+
+    fun setEngine(prefs: SharedPreferences, value: FrameGenEngine) {
+        prefs.edit().putInt(KEY_ENGINE, value.value).apply()
+    }
+
+    fun disPreset(prefs: SharedPreferences): DisFlowPreset =
+        DisFlowPreset.fromMinSide(prefs.getInt(KEY_DIS_MIN_SIDE, DisFlowPreset.Default.minSide))
+
+    fun setDisPreset(prefs: SharedPreferences, value: DisFlowPreset) {
+        prefs.edit().putInt(KEY_DIS_MIN_SIDE, value.minSide).apply()
+    }
+
     fun sourceName(prefs: SharedPreferences): String = prefs.getString(KEY_SOURCE_NAME, "").orEmpty()
 
     fun importedAt(prefs: SharedPreferences): Long = prefs.getLong(KEY_IMPORTED_AT, 0L)
@@ -139,7 +203,8 @@ object FrameGen {
             flowWidth = raw?.optInt("flowWidth", 0) ?: 0,
             flowHeight = raw?.optInt("flowHeight", 0) ?: 0,
             guestWidth = raw?.optInt("guestWidth", 0) ?: 0,
-            guestHeight = raw?.optInt("guestHeight", 0) ?: 0
+            guestHeight = raw?.optInt("guestHeight", 0) ?: 0,
+            engine = FrameGenPrefs.engine(prefs)
         )
 
         state.value = result
@@ -148,13 +213,26 @@ object FrameGen {
 
     fun push(context: Context) {
         val prefs = FrameGenPrefs.of(context)
+        val engine = FrameGenPrefs.engine(prefs)
+
+        if (state.value.engine != engine) {
+            state.value = state.value.copy(engine = engine)
+        }
 
         RPCS3.instance.frameGenConfigure(
-            FrameGenPrefs.isEnabled(prefs) && state.value.imported,
+            FrameGenPrefs.isEnabled(prefs) && state.value.usable,
             FrameGenPrefs.multiplier(prefs),
             FrameGenPrefs.targetRate(prefs),
-            FrameGenPrefs.preset(prefs).flowScale
+            FrameGenPrefs.preset(prefs).flowScale,
+            engine.value,
+            FrameGenPrefs.disPreset(prefs).minSide
         )
+    }
+
+    fun selectEngine(context: Context, engine: FrameGenEngine) {
+        state.value = state.value.copy(engine = engine)
+        FrameGenPrefs.setEngine(FrameGenPrefs.of(context), engine)
+        push(context)
     }
 
     fun pushRefreshRate(hz: Float) {

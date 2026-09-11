@@ -688,6 +688,8 @@ if(TARGET 3rdparty_vulkan)
             RSX/VK/lsfg/lsfg_mipmaps.cpp
             RSX/VK/lsfg/lsfg_pacer.cpp
             RSX/VK/lsfg/lsfg_shaders.cpp
+            RSX/VK/dis/dis_flow.cpp
+            RSX/VK/dis/dis_shaders.cpp
             RSX/VK/VKFrameGeneration.cpp
         )
 
