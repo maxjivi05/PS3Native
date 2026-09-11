@@ -332,6 +332,15 @@ namespace vk
 		swap_info.imageColorSpace = m_color_space;
 
 		swap_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+		if (surface_descriptors.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
+		{
+			swap_info.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		}
+		else
+		{
+			rsx_log.warning("Swapchain images cannot be used as a transfer source. Frame generation will be unavailable.");
+		}
 		swap_info.preTransform = pre_transform;
 		swap_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 		swap_info.imageArrayLayers = 1;

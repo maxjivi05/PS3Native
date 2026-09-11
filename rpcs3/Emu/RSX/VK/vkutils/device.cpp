@@ -676,6 +676,15 @@ namespace vk
 		enabled_features.textureCompressionBC = pgpu->features.textureCompressionBC;
 		enabled_features.shaderStorageBufferArrayDynamicIndexing = VK_TRUE;
 
+#ifdef ANDROID
+		enabled_features.shaderStorageImageExtendedFormats = pgpu->features.shaderStorageImageExtendedFormats;
+
+		if (!pgpu->features.shaderStorageImageExtendedFormats)
+		{
+			rsx_log.warning("Your GPU driver does not support extended storage image formats. Frame generation with the DIS engine will be unavailable.");
+		}
+#endif
+
 		// Optionally disable unsupported stuff
 		if (!pgpu->features.fullDrawIndexUint32)
 		{
