@@ -2,6 +2,8 @@
 #include "VKFrameGeneration.h"
 #include "vkutils/device.h"
 
+#include "Emu/system_config.h"
+
 #include "lsfg/lsfg_chain.hpp"
 #include "lsfg/lsfg_pacer.hpp"
 #include "lsfg/lsfg_shaders.hpp"
@@ -317,6 +319,7 @@ namespace vk
 		pacer_config.multiplier = settings.multiplier;
 		pacer_config.target_rate = settings.target_rate;
 		pacer_config.refresh_rate = frame_generation_refresh_rate();
+		pacer_config.source_rate = static_cast<float>(g_cfg.video.vblank_rate);
 		m_impl->pacer.SetConfig(pacer_config);
 
 		if (m_impl->chain &&
@@ -408,10 +411,11 @@ namespace vk
 		{
 			const lsfg::LsfgPacerStats stats = m_impl->pacer.Stats();
 			const float wanted = stats.source_rate * static_cast<float>(m_impl->plan.generations + 1);
-			rsx_log.notice("Frame generation: gen=%zu max=%zu cap=%u guest=%.1f loop=%.1f refresh=%.1f target=%.0f "
-				"slots=%.2f needs=%.1fHz%s%s",
-				m_impl->plan.generations, m_impl->pacer.MaxGenerations(), capacity, stats.source_rate, stats.loop_rate,
-				stats.refresh_rate, stats.target_rate, stats.slots, wanted,
+			rsx_log.notice("Frame generation: gen=%zu max=%zu cap=%u cost=%zu guest=%.1f loop=%.1f refresh=%.1f target=%.0f "
+				"slots=%.2f needs=%.1fHz jumps=%u%s%s%s",
+				m_impl->plan.generations, m_impl->pacer.MaxGenerations(), capacity, stats.cost_limit, stats.source_rate,
+				stats.loop_rate, stats.refresh_rate, stats.target_rate, stats.slots, wanted, stats.rate_jumps,
+				stats.probing ? " probing" : "",
 				(stats.refresh_rate > 0.f && wanted > stats.refresh_rate + 1.f) ? " PANEL-BOUND" : "",
 				stats.rates_settled ? (m_impl->warm ? "" : " cold") : " sampling");
 		}
