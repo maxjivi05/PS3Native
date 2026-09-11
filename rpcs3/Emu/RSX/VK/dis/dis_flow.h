@@ -14,7 +14,6 @@ class render_device;
 
 namespace dis {
 
-constexpr u32 DIS_MAX_GENERATIONS = 3;
 constexpr u32 DIS_LOCAL_SIZE = 8;
 constexpr u32 DIS_PATCH_STRIDE = 3;
 constexpr u32 DIS_MIN_EXTENT = 16;
@@ -207,18 +206,6 @@ public:
         return image;
     }
 
-    [[nodiscard]] VkExtent2D Extent() const {
-        return extent;
-    }
-
-    [[nodiscard]] VkFormat Format() const {
-        return format;
-    }
-
-    [[nodiscard]] u32 MipLevels() const {
-        return mip_levels;
-    }
-
     [[nodiscard]] bool Valid() const {
         return image != VK_NULL_HANDLE;
     }
@@ -229,9 +216,6 @@ private:
     VkDevice device{VK_NULL_HANDLE};
     VkImage image{VK_NULL_HANDLE};
     VkDeviceMemory memory{VK_NULL_HANDLE};
-    VkExtent2D extent{};
-    VkFormat format{VK_FORMAT_UNDEFINED};
-    u32 mip_levels{};
 };
 
 class DisFlow {
@@ -244,7 +228,7 @@ public:
     DisFlow(DisFlow&&) = delete;
     DisFlow& operator=(DisFlow&&) = delete;
 
-    bool Configure(u32 flow_min_side_, u32 target_fps_, float refresh_rate_);
+    bool Configure(u32 flow_min_side_);
 
     [[nodiscard]] bool NeedsRebuild(u32 width, u32 height, VkFormat format) const;
 
@@ -252,8 +236,8 @@ public:
 
     void Process(VkCommandBuffer cmd, VkImage source, u32 width, u32 height, u32 generations);
 
-    void GenerateInto(VkCommandBuffer cmd, u32 generation, u32 target_index, VkImage target_image,
-                      VkImageView target_view, u32 width, u32 height, VkImage base_image);
+    void GenerateInto(VkCommandBuffer cmd, u32 generation, VkImage target_image, u32 width,
+                      u32 height);
 
     void ForgetTargets();
 
@@ -265,10 +249,6 @@ public:
 
     [[nodiscard]] VkExtent2D FlowExtent() const {
         return built_extent;
-    }
-
-    [[nodiscard]] u32 Levels() const {
-        return levels;
     }
 
 private:
@@ -284,13 +264,11 @@ private:
     void Dispatch(VkCommandBuffer cmd, VkPipeline pipeline, VkDescriptorSet set, u32 width,
                   u32 height) const;
     void RenderInto(VkCommandBuffer cmd, float timestamp, VkImage target_image, u32 width,
-                    u32 height, VkImage base_image);
+                    u32 height);
 
     Device device;
 
     u32 flow_min_side{DIS_DEFAULT_FLOW_MIN_SIDE};
-    u32 target_fps{};
-    float refresh_rate{};
 
     VkExtent2D built_extent{};
     VkExtent2D built_full_extent{};

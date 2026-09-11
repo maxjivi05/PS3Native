@@ -381,7 +381,7 @@ namespace vk
 
 		if (m_impl->engine == frame_generation_engine::dis)
 		{
-			if (!m_impl->flow->Configure(settings.dis_min_side, settings.target_rate, pacer_config.refresh_rate))
+			if (!m_impl->flow->Configure(settings.dis_min_side))
 			{
 				m_impl->built_extent = VkExtent2D{};
 			}
@@ -607,7 +607,7 @@ namespace vk
 
 		if (m_impl->engine == frame_generation_engine::dis)
 		{
-			m_impl->flow->GenerateInto(cmd, index, index, target, VK_NULL_HANDLE, width, height, VK_NULL_HANDLE);
+			m_impl->flow->GenerateInto(cmd, index, target, width, height);
 
 			const VkImageMemoryBarrier after = make_barrier(target, VK_ACCESS_TRANSFER_WRITE_BIT, 0,
 				VK_IMAGE_LAYOUT_GENERAL, present_layout);

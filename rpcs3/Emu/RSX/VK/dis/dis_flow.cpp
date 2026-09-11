@@ -306,14 +306,13 @@ u32 Device::FindMemoryType(u32 bits, VkMemoryPropertyFlags properties) const {
 
 DisImage::DisImage(const Device& device_, u32 width, u32 height, VkFormat format_, u32 mip_levels_,
                    VkImageUsageFlags usage)
-    : device{device_.Handle()}, extent{std::max(1u, width), std::max(1u, height)}, format{format_},
-      mip_levels{std::max(1u, mip_levels_)} {
+    : device{device_.Handle()} {
     VkImageCreateInfo image_ci{};
     image_ci.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     image_ci.imageType = VK_IMAGE_TYPE_2D;
-    image_ci.format = format;
-    image_ci.extent = {extent.width, extent.height, 1};
-    image_ci.mipLevels = mip_levels;
+    image_ci.format = format_;
+    image_ci.extent = {std::max(1u, width), std::max(1u, height), 1};
+    image_ci.mipLevels = std::max(1u, mip_levels_);
     image_ci.arrayLayers = 1;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -338,7 +337,9 @@ DisImage::DisImage(const Device& device_, u32 width, u32 height, VkFormat format
         Release();
         return;
     }
-    VK_GET_SYMBOL(vkBindImageMemory)(device, image, memory, 0);
+    if (VK_GET_SYMBOL(vkBindImageMemory)(device, image, memory, 0) != VK_SUCCESS) {
+        Release();
+    }
 }
 
 DisImage::~DisImage() {
@@ -346,8 +347,7 @@ DisImage::~DisImage() {
 }
 
 DisImage::DisImage(DisImage&& other) noexcept
-    : device{other.device}, image{other.image}, memory{other.memory}, extent{other.extent},
-      format{other.format}, mip_levels{other.mip_levels} {
+    : device{other.device}, image{other.image}, memory{other.memory} {
     other.device = VK_NULL_HANDLE;
     other.image = VK_NULL_HANDLE;
     other.memory = VK_NULL_HANDLE;
@@ -359,9 +359,6 @@ DisImage& DisImage::operator=(DisImage&& other) noexcept {
         device = other.device;
         image = other.image;
         memory = other.memory;
-        extent = other.extent;
-        format = other.format;
-        mip_levels = other.mip_levels;
         other.device = VK_NULL_HANDLE;
         other.image = VK_NULL_HANDLE;
         other.memory = VK_NULL_HANDLE;
@@ -772,10 +769,24 @@ void DisFlow::DestroyResources() {
     vr_dw[0] = DisImage();
     vr_dw[1] = DisImage();
     flow_refined = DisImage();
+
+    built = false;
+    built_extent = VkExtent2D{};
+    built_full_extent = VkExtent2D{};
+    built_format = VK_FORMAT_UNDEFINED;
+    built_min_side = 0;
+    levels = 0;
+    frame_count = 0;
+    active_slot = 0;
+    last_generations = 0;
 }
 
 bool DisFlow::CreateResources(u32 width, u32 height, u32 full_width, u32 full_height,
                               VkFormat format) {
+    if (built) {
+        VK_GET_SYMBOL(vkDeviceWaitIdle)(device.Handle());
+    }
+
     DestroyResources();
     layouts_primed = false;
 
@@ -980,7 +991,7 @@ void DisFlow::PrimeLayouts(VkCommandBuffer cmd) {
     if (layouts_primed) return;
 
     std::vector<VkImage> images;
-    images.reserve(40);
+    images.reserve(DIS_SLOTS * 3 + DIS_MAX_LEVELS * 2 + 12);
 
     const auto push = [&images](const DisImage& image) {
         if (image.Valid()) images.push_back(image.Handle());
@@ -1044,12 +1055,10 @@ void DisFlow::Dispatch(VkCommandBuffer cmd, VkPipeline pipeline, VkDescriptorSet
     VK_GET_SYMBOL(vkCmdDispatch)(cmd, DispatchGroups(width), DispatchGroups(height), 1);
 }
 
-bool DisFlow::Configure(u32 flow_min_side_, u32 target_fps_, float refresh_rate_) {
+bool DisFlow::Configure(u32 flow_min_side_) {
     if (!Valid()) return false;
 
     flow_min_side = std::clamp(flow_min_side_, DIS_FLOW_MIN_SIDE_FLOOR, DIS_FLOW_MIN_SIDE_CEIL);
-    target_fps = target_fps_;
-    refresh_rate = refresh_rate_ > 0.0f ? refresh_rate_ : 0.0f;
     return true;
 }
 
@@ -1341,7 +1350,7 @@ void DisFlow::Process(VkCommandBuffer cmd, VkImage source, u32 width, u32 height
 }
 
 void DisFlow::RenderInto(VkCommandBuffer cmd, float timestamp, VkImage target_image, u32 width,
-                         u32 height, VkImage base_image) {
+                         u32 height) {
     const u32 content_w = built_full_extent.width;
     const u32 content_h = built_full_extent.height;
 
@@ -1365,14 +1374,6 @@ void DisFlow::RenderInto(VkCommandBuffer cmd, float timestamp, VkImage target_im
                  VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
                  VK_ACCESS_TRANSFER_WRITE_BIT);
 
-    if (base_image != VK_NULL_HANDLE) {
-        BlitRect(cmd, base_image, 0, 0, content_w, content_h, target_image, 0, 0, width, height,
-                 VK_FILTER_LINEAR);
-        ImageBarrier(cmd, target_image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
-                     VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                     VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
-    }
-
     BlitRect(cmd, interp_out.Handle(), 0, 0, content_w, content_h, target_image, 0, 0, width,
              height, VK_FILTER_LINEAR);
 
@@ -1381,19 +1382,15 @@ void DisFlow::RenderInto(VkCommandBuffer cmd, float timestamp, VkImage target_im
                  VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_SHADER_WRITE_BIT);
 }
 
-void DisFlow::GenerateInto(VkCommandBuffer cmd, u32 generation, u32 target_index,
-                           VkImage target_image, VkImageView target_view, u32 width, u32 height,
-                           VkImage base_image) {
-    static_cast<void>(target_index);
-    static_cast<void>(target_view);
-
+void DisFlow::GenerateInto(VkCommandBuffer cmd, u32 generation, VkImage target_image, u32 width,
+                           u32 height) {
     if (!built || !Valid()) return;
     if (last_generations == 0) return;
     if (width == 0 || height == 0 || target_image == VK_NULL_HANDLE) return;
 
     const float timestamp =
         static_cast<float>(generation + 1) / static_cast<float>(last_generations + 1);
-    RenderInto(cmd, timestamp, target_image, width, height, base_image);
+    RenderInto(cmd, timestamp, target_image, width, height);
 }
 
 void DisFlow::ForgetTargets() {
