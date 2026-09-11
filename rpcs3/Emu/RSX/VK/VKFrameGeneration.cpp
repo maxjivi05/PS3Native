@@ -260,6 +260,7 @@ namespace vk
 				rsx_log.warning("Frame generation: the DIS engine could not be created on this device");
 				m_impl.reset();
 				m_unavailable = true;
+				set_frame_generation_status({ .ready = false, .unsupported = true });
 				return;
 			}
 
@@ -396,8 +397,7 @@ namespace vk
 			{
 				rsx_log.error("Frame generation: the DIS chain could not be built at %ux%u; disabling", width, height);
 				m_unavailable = true;
-				set_frame_generation_status({ .ready = false, .unsupported = true, .width = width, .height = height,
-					.engine = frame_generation_engine::dis });
+				set_frame_generation_status({ .ready = false, .unsupported = true, .width = width, .height = height });
 				return false;
 			}
 
@@ -415,8 +415,7 @@ namespace vk
 
 			set_frame_generation_status({ .ready = true, .unsupported = false, .width = width, .height = height,
 				.flow_width = flow.width, .flow_height = flow.height,
-				.guest_width = m_impl->peak_guest_extent.width, .guest_height = m_impl->peak_guest_extent.height,
-				.engine = frame_generation_engine::dis });
+				.guest_width = m_impl->peak_guest_extent.width, .guest_height = m_impl->peak_guest_extent.height });
 			rsx_log.notice("Frame generation: DIS chain built at %ux%u, flow at %ux%u (shorter side %u, game outputs %ux%u)",
 				width, height, flow.width, flow.height, settings.dis_min_side,
 				m_impl->peak_guest_extent.width, m_impl->peak_guest_extent.height);

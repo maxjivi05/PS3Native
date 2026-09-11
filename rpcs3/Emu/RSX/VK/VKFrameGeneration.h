@@ -41,7 +41,6 @@ namespace vk
 		u32 flow_height = 0;
 		u32 guest_width = 0;
 		u32 guest_height = 0;
-		frame_generation_engine engine = frame_generation_engine::lsfg;
 	};
 
 	void set_frame_generation_shader_cache(std::string path);

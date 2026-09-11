@@ -1964,7 +1964,7 @@ extern "C" JNIEXPORT void JNICALL Java_net_rpcs3_RPCS3_frameGenConfigure(
   settings.engine = engine == static_cast<jint>(vk::frame_generation_engine::dis)
                         ? vk::frame_generation_engine::dis
                         : vk::frame_generation_engine::lsfg;
-  settings.dis_min_side = static_cast<u32>(std::clamp<jint>(disMinSide, 64, 1080));
+  settings.dis_min_side = static_cast<u32>(std::max<jint>(disMinSide, 0));
   vk::set_frame_generation_settings(settings);
 }
 

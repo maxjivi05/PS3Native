@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2026 qwertypower (DEVAR Entertainment LLC)
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "stdafx.h"
 #include "dis_shaders.hpp"
 
@@ -852,16 +855,5 @@ void main() {
 		s_dis_shader_cache[index] = std::move(spirv);
 		s_dis_shader_state[index] = dis_shader_state::ready;
 		return &s_dis_shader_cache[index];
-	}
-
-	void ReleaseDisShaders()
-	{
-		std::lock_guard lock(s_dis_shader_lock);
-
-		for (usz i = 0; i < dis_shader_count; i++)
-		{
-			s_dis_shader_cache[i] = std::vector<u32>();
-			s_dis_shader_state[i] = dis_shader_state::pending;
-		}
 	}
 }

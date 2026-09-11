@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2026 qwertypower (DEVAR Entertainment LLC)
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #pragma once
 
 #include "util/types.hpp"
@@ -25,6 +28,4 @@ namespace dis
 	};
 
 	const std::vector<u32>* GetDisShader(DisShader id);
-
-	void ReleaseDisShaders();
 }

@@ -513,6 +513,8 @@ bool DisFlow::CreateSampler() {
 }
 
 bool DisFlow::CreatePipelines() {
+    rsx_log.notice("Frame generation: compiling the DIS shader chain");
+
     std::array<VkDescriptorSetLayoutBinding, DIS_SET_SAMPLERS + DIS_SET_STORAGE> bindings{};
     for (u32 i = 0; i < DIS_SET_SAMPLERS; i++) {
         bindings[i].binding = i;

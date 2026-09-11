@@ -74,6 +74,15 @@ fun FrameGenPanel(modifier: Modifier = Modifier) {
 
     LaunchedEffect(Unit) { FrameGen.refresh(context) }
 
+    LaunchedEffect(state.engine) {
+        enabled = FrameGenPrefs.isEnabled(prefs)
+        multiplier = FrameGenPrefs.multiplier(prefs)
+        targetRate = FrameGenPrefs.targetRate(prefs)
+        preset = FrameGenPrefs.preset(prefs)
+        engine = FrameGenPrefs.engine(prefs)
+        disPreset = FrameGenPrefs.disPreset(prefs)
+    }
+
     val picker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
         onResult = { uri: Uri? ->

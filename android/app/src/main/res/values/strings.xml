@@ -504,7 +504,7 @@
 
     <string name="framegen_section_engine">Engine</string>
     <string name="framegen_engine_lsfg">Lossless Scaling</string>
-    <string name="framegen_engine_lsfg_detail">imported shaders</string>
+    <string name="framegen_engine_lsfg_detail">needs a DLL</string>
     <string name="framegen_engine_lsfg_note">Interpolates with the Lossless Scaling shader chain. Import Lossless.dll once and it is translated and cached for this device.</string>
     <string name="framegen_engine_dis">DIS</string>
     <string name="framegen_engine_dis_detail">built in</string>
