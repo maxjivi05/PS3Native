@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "swapchain.h"
+#include "Emu/system_config.h"
 
 #ifdef ANDROID
 #include "../VKFrameGeneration.h"

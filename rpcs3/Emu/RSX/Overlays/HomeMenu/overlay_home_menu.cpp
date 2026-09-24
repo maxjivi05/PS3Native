@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "overlay_home_menu.h"
 #include "../overlay_manager.h"
+#include "Emu/System.h"
+#include "Emu/emu_callbacks.h"
 #include "Emu/system_config.h"
 #include "Utilities/date_time.h"
 
@@ -115,7 +117,7 @@ namespace rsx
 					if (m_main_menu.m_config_changed && *m_main_menu.m_config_changed)
 					{
 						rsx_log.notice("home_menu_dialog: saving settings on exit");
-						Emu.GetCallbacks().save_emu_settings();
+						g_emu_callbacks.save_emu_settings();
 						*m_main_menu.m_config_changed = false;
 					}
 #endif

@@ -65,6 +65,7 @@
 #include <Emu/Io/pad_config.h>
 #include <Emu/RSX/GSFrameBase.h>
 #include <Emu/System.h>
+#include <Emu/emu_callbacks.h>
 
 #include <algorithm>
 #include <set>
@@ -452,14 +453,14 @@ static void sendGameInfo(JNIEnv *env, jlong progressId,
   objects.reserve(infos.size());
 
   for (const auto &info : infos) {
-    auto path = Emu.GetCallbacks().resolve_path(info.path);
+    auto path = g_emu_callbacks.resolve_path(info.path);
     if (path.ends_with('/')) {
       path.resize(path.size() - 1);
     }
 
     objects.push_back(env->NewObject(
         gameClass, gameConstructor, wrap(env, path), wrap(env, info.name),
-        wrap(env, Emu.GetCallbacks().resolve_path(info.iconPath)),
+        wrap(env, g_emu_callbacks.resolve_path(info.iconPath)),
         jint(info.flags)));
   }
 
@@ -1391,7 +1392,7 @@ static void setupRenderers() {
 static void settings_save_async(std::string data, std::string titleId);
 
 static void setupCallbacks() {
-  Emu.SetCallbacks({
+  g_emu_callbacks = {
       .call_from_main_thread =
           [](std::function<void()> cb, atomic_t<u32> *wake_up) {
             if (g_mainThreadProcessor.onWorkerThread()) {
@@ -1584,7 +1585,7 @@ static void setupCallbacks() {
           [] { return std::make_unique<NullVideoSource>(); },
       .enable_gamemode = [](auto...) {},
       .get_database_config = [](auto...) { return std::string(); },
-  });
+  };
 }
 
 static bool initVirtualPad(const std::shared_ptr<Pad> &pad) {
