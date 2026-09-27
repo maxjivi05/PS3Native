@@ -149,8 +149,12 @@ namespace vk
 		case driver_vendor::ARM_MALI:
 			// Needs more testing
 			break;
-		case driver_vendor::ADRENO:
+		case driver_vendor::QUALCOMM:
+			// Needs more testing
+			break;
 		case driver_vendor::TURNIP:
+			// GPU hangs in some titles due to waiting for a query result
+			g_drv_strict_query_scopes = true;
 			break;
 		case driver_vendor::POWERVR:
 		case driver_vendor::XCLIPSE:

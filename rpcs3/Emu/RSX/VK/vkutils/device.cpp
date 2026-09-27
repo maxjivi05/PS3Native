@@ -281,7 +281,7 @@ namespace vk
 		const auto mobile_vendor = get_driver_vendor();
 		const bool mobile_fp16_ok =
 			mobile_vendor == driver_vendor::TURNIP ||
-			(mobile_vendor == driver_vendor::ADRENO && props.driverVersion >= s_adreno_fp16_min_driver);
+			(mobile_vendor == driver_vendor::QUALCOMM && props.driverVersion >= s_adreno_fp16_min_driver);
 
 		if (!mobile_fp16_ok && is_MOBILE(mobile_vendor) && shader_types_support.allow_float16)
 		{
@@ -388,7 +388,7 @@ namespace vk
 			}
 			else if (gpu_name.find("Adreno") != umax)
 			{
-				return driver_vendor::ADRENO;
+				return driver_vendor::QUALCOMM;
 			}
 
 			if (gpu_name.find("PowerVR") != umax || gpu_name.find("Imagination") != umax)
@@ -433,7 +433,7 @@ namespace vk
 			case VK_DRIVER_ID_ARM_PROPRIETARY:
 				return driver_vendor::ARM_MALI;
 			case VK_DRIVER_ID_QUALCOMM_PROPRIETARY:
-				return driver_vendor::ADRENO;
+				return driver_vendor::QUALCOMM;
 			case VK_DRIVER_ID_MESA_TURNIP:
 				return driver_vendor::TURNIP;
 			case VK_DRIVER_ID_IMAGINATION_PROPRIETARY:
@@ -991,6 +991,11 @@ namespace vk
 	{
 		// Rebalance device local memory types
 		memory_map.device_local.rebalance();
+	}
+
+	bool render_device::get_debug_utils_support() const
+	{
+		return g_cfg.video.renderdoc_compatiblity && pgpu->optional_features_support.debug_utils;
 	}
 
 	void render_device::dump_debug_info(

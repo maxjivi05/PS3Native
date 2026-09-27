@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "instance.h"
 
+#include "Emu/system_config.h"
+
 #ifdef ANDROID
 #include <dlfcn.h>
 #include <fstream>
