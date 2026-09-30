@@ -93,6 +93,7 @@
   <ItemGroup>
     <ClCompile Include="test.cpp" />
     <ClCompile Include="test_bit_set.cpp" />
+    <ClCompile Include="test_cctype.cpp" />
     <ClCompile Include="test_dmux_pamf.cpp">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </ClCompile>
@@ -104,6 +105,8 @@
     <ClCompile Include="test_simple_array.cpp" />
     <ClCompile Include="test_address_range.cpp" />
     <ClCompile Include="test_sys_fs.cpp" />
+    <ClCompile Include="test_iso_open.cpp" />
+    <ClCompile Include="test_iso_extent.cpp" />
     <ClCompile Include="test_tuple.cpp" />
     <ClCompile Include="test_pair.cpp" />
     <ClCompile Include="test_types_util.cpp" />

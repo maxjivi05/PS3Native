@@ -7,6 +7,8 @@
 #include "Emu/Cell/lv2/sys_mmapper.h"
 #include "Emu/Cell/lv2/sys_event.h"
 #include "Emu/Cell/lv2/sys_process.h"
+#include "Emu/RSX/RSXThread.h"
+#include "Emu/system_config.h"
 #include "Thread.h"
 #include <cstring>
 #include <cerrno>
@@ -105,6 +107,7 @@ DYNAMIC_IMPORT_RENAME("Kernel32.dll", SetThreadDescriptionImport, "SetThreadDesc
 #include "util/asm.hpp"
 #include "util/v128.hpp"
 #include "util/simd.hpp"
+#include "util/cctype.hpp"
 #include "util/sysinfo.hpp"
 #include "Emu/Memory/vm_locking.h"
 
@@ -210,9 +213,9 @@ bool IsDebuggerPresent()
 
 	for (const char* cp = status.data() + found + 10; cp <= status.data() + num_read; ++cp)
 	{
-		if (!std::isspace(*cp))
+		if (!utils::isspace(*cp))
 		{
-			return std::isdigit(*cp) != 0 && *cp != '0';
+			return utils::isdigit(*cp) != 0 && *cp != '0';
 		}
 	}
 

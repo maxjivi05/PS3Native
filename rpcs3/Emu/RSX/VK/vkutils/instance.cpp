@@ -8,6 +8,7 @@
 #include <adrenotools/driver.h>
 #include <adrenotools/priv.h>
 #endif
+#include "Emu/system_config.h"
 
 namespace vk
 {

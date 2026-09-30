@@ -54,12 +54,6 @@ namespace vk
 				optimal_kernel_size = 1;
 				optimal_group_size = 128;
 				break;
-			case vk::driver_vendor::ADRENO:
-			case vk::driver_vendor::TURNIP:
-				unroll_loops = true;
-				optimal_kernel_size = 1;
-				optimal_group_size = 64;
-				break;
 			case vk::driver_vendor::LAVAPIPE:
 			case vk::driver_vendor::V3DV:
 			case vk::driver_vendor::PANVK:
@@ -90,6 +84,13 @@ namespace vk
 				unroll_loops = true;
 				optimal_kernel_size = 1;
 				optimal_group_size = 256;
+				break;
+			case vk::driver_vendor::QUALCOMM:
+			case vk::driver_vendor::TURNIP:
+				// Wavefronts are multiples of 64. (Some generations also support wave128)
+				unroll_loops = true;
+				optimal_kernel_size = 1;
+				optimal_group_size = 64;
 				break;
 			}
 
